@@ -1,8 +1,8 @@
-#ifndef NETWORK_TCP_CLIENT_H
-#define NETWORK_TCP_CLIENT_H
+#ifndef NETWORK_UDP_CLIENT_H
+#define NETWORK_UDP_CLIENT_H
 
-#ifndef TCP_CLIENT_MAX_PAYLOAD_LENGTH
-#define TCP_CLIENT_MAX_PAYLOAD_LENGTH 1224
+#ifndef UDP_CLIENT_MAX_PAYLOAD_LENGTH
+#define UDP_CLIENT_MAX_PAYLOAD_LENGTH 1224
 #endif
 
 
@@ -12,10 +12,6 @@
  */
 struct udp_client_t;
 
-/**
- * @brief The client receive message handler
- */
-typedef void(*client_handler)(struct udp_client_t*, char*);
 
 /**
  * @brief Send a message to the server.
@@ -23,7 +19,7 @@ typedef void(*client_handler)(struct udp_client_t*, char*);
  * @param client The client that should send the message.
  * @param message The message that sould be send.
  */
-void udp_client_t_send(struct udp_client_t* client, char* message);
+void udp_client_t_send(struct udp_client_t* client, void* message, int len);
 
 /**
  * @brief Allocates and initialize a udp_client_t structure.
@@ -56,6 +52,9 @@ void udp_client_t_disconnect(struct udp_client_t* client);
  * @param length The upper bound length of the message that will be stored.
  * @return 1 if a message was received and -1 otherwise.
  */
-int udp_client_t_receive(struct udp_client_t* client, char* message, int length);
+int udp_client_t_receive(struct udp_client_t* client, void* message, int length);
+
+int udp_client_t_receive_with_timeout(struct udp_client_t* client, void* message, int length);
+
 
 #endif

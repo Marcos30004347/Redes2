@@ -23,7 +23,7 @@ typedef void(*client_handler)(struct tcp_client_t*, char*);
  * @param client The client that should send the message.
  * @param message The message that sould be send.
  */
-void tcp_client_t_send(struct tcp_client_t* client, char* message);
+void tcp_client_t_send(struct tcp_client_t* client, void* message, int len);
 
 /**
  * @brief Allocates and initialize a tcp_client_t structure.
@@ -56,6 +56,6 @@ void tcp_client_t_disconnect(struct tcp_client_t* client);
  * @param length The upper bound length of the message that will be stored.
  * @return 1 if a message was received and -1 otherwise.
  */
-int tcp_client_t_receive(struct tcp_client_t* client, char* message, int length);
+int tcp_client_t_receive(struct tcp_client_t* client, void* message, int length);
 
 #endif

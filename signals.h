@@ -1,12 +1,12 @@
 #ifndef SIGNALS_H
 #define SIGNALS_H
 
-#define HELLO       1
-#define CONNECTION  2
-#define INFO_FILE   3
-#define OK          4
-#define FIM         5
-#define FILE        6
-#define ACK         7
+const short MESSAGE_HELLO       = 1;
+const short MESSAGE_CONNECTION  = 2;
+const short MESSAGE_INFO_FILE   = 3;
+const short MESSAGE_OK          = 4;
+const short MESSAGE_FIM         = 5;
+const short MESSAGE_FILE        = 6;
+const short MESSAGE_ACK         = 7;
 
 #endif

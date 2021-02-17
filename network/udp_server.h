@@ -1,7 +1,6 @@
 #ifndef NETWORK_UDP_SERVER_H
 #define NETWORK_UDP_SERVER_H
 
-
 /**
  * @brief The TCP Server structure.
  * 
@@ -9,12 +8,11 @@
 struct udp_server_t;
 typedef struct udp_server_t udp_server_t;
 
-
 /**
  * @brief This is a type that represents a pointer
  * to a function that will handle a payload.
  */
-typedef void(*udp_server_t_request_handler)(struct request_t req, struct reply_t rep);
+typedef void(*udp_server_t_request_handler)();
 
 /**
  * @brief This function allocates and initialize a TCP Server.
@@ -50,12 +48,15 @@ void udp_server_t_bind_to_port(struct udp_server_t* server, int port);
  */
 void udp_server_t_terminate(struct udp_server_t* server);
 
-/**
- * @brief Start a server making it accept connection.
- * 
- * @param server The server that should start executing.
- */
-void udp_server_t_start(struct udp_server_t* server);
+// /**
+//  * @brief Start a server making it accept connection.
+//  * 
+//  * @param server The server that should start executing.
+//  */
+// void udp_server_t_start(struct udp_server_t* server);
+
+long udp_server_t_receice(struct udp_server_t* server, void* buffer, int* len);
+
 
 /**
  * @brief Set the request handler of a server.
@@ -71,7 +72,7 @@ void udp_server_t_set_request_handler(struct udp_server_t* server, udp_server_t_
  * @param client The client that sould receive the message.
  * @param message The message that sould be send.
  */
-void send_message_to_client(int client, const char* message);
+void udp_send_message_to_client(int client, const char* message);
 
 /**
  * @brief Disconnect a client from the server.

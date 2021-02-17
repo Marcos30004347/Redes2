@@ -70,15 +70,6 @@ void tcp_server_t_terminate(struct tcp_server_t* server);
  */
 void tcp_server_t_start(struct tcp_server_t* server);
 
-
-/**
- * @brief Sends a message to a connected tcp client.
- * 
- * @param client The client that sould receive the message.
- * @param message The message that sould be send.
- */
-void send_message_to_client(int client, const char* message);
-
 /**
  * @brief Disconnect a client from the server.
  * 

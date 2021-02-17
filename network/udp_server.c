@@ -39,10 +39,10 @@ struct udp_server_t {
     udp_server_t_request_handler    request_handler;
 };
 
-void* udp_server_t_client_handler(struct thread_data* data)
+void* udp_server_t_client_handler(void* _data)
 {
     // struct thread_data* data = (struct thread_data*)c;
-
+    struct thread_data* data = (struct thread_data*)(_data);
     struct udp_server_t* server = data->server;
     int connfd = data->connfd;
 
@@ -173,22 +173,14 @@ struct connection_t udp_server_t_accept_connection(struct udp_server_t* server)
     return conn;
 }
 
-void udp_server_t_start(struct udp_server_t* server)
+long udp_server_t_receice(struct udp_server_t* server, void* buffer, int* len) 
 {
-    if ((listen(server->server_fd, 5)) != 0) { 
-        printf("[ERROR]: Nao foi possivel escutar\n"); 
-        exit(0); 
-    }
+    struct sockaddr_in cliaddr; 
 
-    struct connection_t connection = udp_server_t_accept_connection(server);
-
-    while(connection.client_fd != -1)
-    {
-        udp_server_t_hold_connection(server, connection);
-        connection = udp_server_t_accept_connection(server);
-    }
+    return recvfrom(server->server_fd, (char *)buffer, 1008,  
+                MSG_WAITALL, ( struct sockaddr *) &cliaddr, 
+                len); 
 }
-
 void udp_server_t_terminate(struct udp_server_t* server)
 {
     struct connection_node_t * tmp = server->connections;
@@ -196,7 +188,7 @@ void udp_server_t_terminate(struct udp_server_t* server)
     while(tmp)
     {
         if(server->kill_message)
-            send_message_to_client(tmp->client, server->kill_message);
+            udp_send_message_to_client(tmp->client, server->kill_message);
         tmp = tmp->prev;
     }
 
@@ -221,7 +213,7 @@ void udp_server_t_set_request_handler(struct udp_server_t* server, udp_server_t_
     server->request_handler = handler;
 }
 
-void send_message_to_client(int client, const char* message)
+void udp_send_message_to_client(int client, const char* message)
 {
     struct sockaddr_in servaddr, cliaddr; 
     int len;
@@ -240,7 +232,7 @@ void udp_server_t_disconnect_client(struct udp_server_t* server, int client)
         if((*connections)->next) (*connections)->next->prev = (*connections)->prev;
 
         if(server->kill_message)
-            send_message_to_client(client, server->kill_message);
+            udp_send_message_to_client(client, server->kill_message);
 
         thread_t_destroy((*connections)->thread);
         free((*connections));

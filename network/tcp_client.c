@@ -8,7 +8,7 @@
 #include <arpa/inet.h>
 #include <strings.h>
 #include <unistd.h>
-
+#include <string.h>
 #include <sys/select.h>
 #include <fcntl.h>
 
@@ -22,7 +22,7 @@ struct tcp_client_t
 };
 
 
-int tcp_client_t_receive(struct tcp_client_t* client, char* message, int length)
+int tcp_client_t_receive(struct tcp_client_t* client, void* message, int length)
 {
 	int sd = client->client_fd;
 
@@ -30,11 +30,13 @@ int tcp_client_t_receive(struct tcp_client_t* client, char* message, int length)
 	FD_ZERO(&input);
 	FD_SET(sd, &input);
 
-	struct timeval timeout = {0, 0};
+	struct timeval timeout = {2, 0};
 
 	int n = select(sd + 1, &input, NULL, NULL, &timeout);
 
-	if (n <= 0 || !FD_ISSET(sd, &input)) {
+	if(n == 0) return 0;
+
+	if (n < 0 || !FD_ISSET(sd, &input)) {
 		return -1;
 	}
 
@@ -42,12 +44,9 @@ int tcp_client_t_receive(struct tcp_client_t* client, char* message, int length)
 	return 1;
 }
 
-void tcp_client_t_send(struct tcp_client_t* client, char* message)
+void tcp_client_t_send(struct tcp_client_t* client, void* message, int len)
 {
-	if(strlen(message) > TCP_CLIENT_MAX_PAYLOAD_LENGTH)
-		return;
-
-	write(client->client_fd, message, strlen(message)); 
+	write(client->client_fd, message, len); 
 }
 
 
