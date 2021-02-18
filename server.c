@@ -1,11 +1,14 @@
+#include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
+
 #include "network/tcp_server.h"
 #include "network/udp_server.h"
 #include "network/signals.h"
 
 #include "signals.h"
+#include "sliding_window.h"
 
 #define PORT_RANGE_START 1400
 #define PORT_RANGE_END 65535
@@ -44,11 +47,6 @@ void free_port(available_ports* buffer, int port)
 
 available_ports ports;
 
-
-int udp_server_handler(tcp_connection_t* connection, receive_fn receive, write_fn write)
-{
-
-}
 
 int hello(tcp_connection_t* connection, receive_fn receive, write_fn write)
 {
@@ -90,23 +88,27 @@ int hello(tcp_connection_t* connection, receive_fn receive, write_fn write)
 
     char* arquivo    = ((char*)&file_info[2]);
     long file_size       = *((long*)&file_info[17]);
+
+    long frame_size = 1000;
+    long frame_count = (long)ceil(file_size/(float)frame_size);
     
     printf("[FILE INFO]: arquivo='%s'\n", arquivo);
     printf("[FILE INFO]: file size='%li'\n", file_size);
 
+    sliding_window* window;
+
     char* filepath = (char*)malloc(strlen(arquivo) + strlen("database/"));
     sprintf(filepath, "%s/%s", "database", arquivo);
-    FILE* file = fopen(filepath, "w");
+    sliding_window_create(&window, filepath, frame_count);
     free(filepath);
-    // Alloc data structures: TODO
-    long bytes_received = 0;
 
     short ok = 4;
     write(connection, &ok, sizeof(short));
     printf("[OK]: recebendo dados...\n");
 
+
     // RECEIVE DATA: TODO
-    while(bytes_received != file_size)
+    while(!sliding_window_eof(window))
     {
         char buffer[1008];
         int len;
@@ -122,26 +124,21 @@ int hello(tcp_connection_t* connection, receive_fn receive, write_fn write)
 
         int sequence = *((int*)&buffer[2]);
         short payload_size = *((short*)&buffer[6]);
-        bytes_received += payload_size;
-
-        // printf("sequence: %i\n", sequence);
-        // printf("payload_size: %i\n", payload_size);
 
         char string[payload_size];
-        memcpy(string, &buffer[8], payload_size);
 
-        fwrite(string, sizeof(char), payload_size, file);
+        sliding_window_ack_frame(window, sequence, &buffer[8], payload_size);
 
-        printf("already received: %li\n", bytes_received);
-        printf("payload size: %i\n", payload_size);
-        
         char ack[6];
-    
+
         *((short*)&ack) = 7;
         *((int*)&ack[2]) = sequence;
 
         write(connection, ack, 6);
     }
+
+    sliding_window_destroy(window);
+
     short fim = 5;
     write(connection, &fim, sizeof(short));
     printf("[FIM]: dados recebidos!\n");
@@ -149,25 +146,6 @@ int hello(tcp_connection_t* connection, receive_fn receive, write_fn write)
     return SERVER_SUCCESS;
 }
 
-int info_file(tcp_connection_t* connection, receive_fn receive, write_fn write)
-{
-    return SERVER_SUCCESS;
-}
-
-int ok(tcp_connection_t* connection, receive_fn receive, write_fn write)
-{
-    return SERVER_SUCCESS;
-}
-
-int fim(tcp_connection_t* connection, receive_fn receive, write_fn write)
-{
-    return SERVER_SUCCESS;
-}
-
-int ack(tcp_connection_t* connection, receive_fn receive, write_fn write)
-{
-    return SERVER_SUCCESS;
-}
 
 int server_handler(tcp_connection_t* conn, receive_fn receive, write_fn write)
 {
@@ -180,8 +158,6 @@ int server_handler(tcp_connection_t* conn, receive_fn receive, write_fn write)
 }
 
 int main(int argc, char *argv[]) {
-    // LOG("Starting Publish/Subscribe Server!\n");
-
     if(argc < 2) 
     {
         printf("Argumentos insuficientes!\n");
@@ -190,7 +166,6 @@ int main(int argc, char *argv[]) {
 
     int port = atoi(argv[1]);
     init_available_ports(&ports);
-
 
     tcp_server_t* server = NULL;
     tcp_server_t_create(&server, server_handler, TCP_SERVER_NONE);

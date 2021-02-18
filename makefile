@@ -7,7 +7,7 @@ server:
 	network/tcp_server.c \
 	network/udp_server.c \
 	network/async.c \
-	-o servidor -lpthread
+	-o servidor -lpthread -lm
 
 client:
 	gcc \
@@ -15,4 +15,9 @@ client:
 	network/tcp_client.c \
 	network/udp_client.c \
 	network/async.c \
-	-o cliente -lpthread
+	-o cliente -lpthread -lm
+
+window-simulator:
+	gcc \
+	simulate_window.c \
+	-o window

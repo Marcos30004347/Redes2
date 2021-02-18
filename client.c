@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "network/tcp_client.h"
 #include "network/udp_client.h"
 #include "network/signals.h"
 
 #include "signals.h"
+#include "sliding_cache.h"
 
 int main(int argc, char *argv[]) {
     if(argc < 3) 
@@ -66,36 +68,55 @@ int main(int argc, char *argv[]) {
     struct udp_client_t* udp_client = NULL;
     udp_client_t_create(&udp_client, url, udp_port);
 
-    int packets = size/1000;
-    int last = size%1000;
+    long frame_size = 1000;
+    long frame_count = (long)ceil(size/(float)frame_size);
+    int last = size%frame_size;
 
-    for(int i=0; i<packets; i++)
+    sliding_cache* window;
+    sliding_cache_create(&window, frame_count);
+
+
+    while(!sliding_cache_eof(window))
     {
-        int payload_size = 1000;
-        if(i == packets - 1) payload_size = last;
-        char payload[payload_size];
-        fread(&payload, sizeof(char), payload_size, file);
+        for(int i=0; i < 32 && window->head + i < frame_count; i++)
+        {
+            int payload_size = 1000;
+            // printf("SENDING %i...\n", window->head + i);
+    
+            if(sliding_cache_has_sended(window, window->head + i)) continue;
+            
+            if(window->head + i == frame_count - 1) payload_size = last;
 
-        char dados[2+4+2+payload_size];
-        *((short*)&dados[0]) = 6;
-        *((int*)&dados[2]) = i;
-        *((short*)&dados[6]) = payload_size;
-        memcpy(&dados[8], payload, payload_size);
+            
+            char dados[8+payload_size];
+            *((short*)&dados[0]) = 6;
+            *((int*)&dados[2]) = window->head + i;
+            *((short*)&dados[6]) = payload_size;
+    
+            fseek(file, (window->head + i)*1000, SEEK_SET);
+            fread(&dados[8], sizeof(char), payload_size, file);
+        
+            udp_client_t_send(udp_client, dados, 8+payload_size);
+        }
 
         char ack[6];
-        int received = 0;
-
-        do {
-            udp_client_t_send(udp_client, dados, 2+4+2+payload_size);
-            received = tcp_client_t_receive(client, ack, 6);
-        } while(received == 0 || received == -1);
-
-        if(*((short*)&ack) != 7)
+        int k = 0;
+        while(!sliding_cache_eof(window) && tcp_client_t_receive(client, ack, 6) && k < 31)
         {
-            printf("Invalid response '%i' from server!\n", *((short*)&ack));
-            exit(-1);
+            k++;
+            if(*((short*)&ack) != 7)
+            {
+                printf("Invalid response '%i' from server!\n", *((short*)&ack));
+                exit(-1);
+            }
+
+    
+            unsigned sequence =*(unsigned*)&ack[2];
+            sliding_cache_ack_frame(window, sequence);
         }
     }
+
+    sliding_cache_destroy(window);
 
     fclose(file);
     short fim;
