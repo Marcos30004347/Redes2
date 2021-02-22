@@ -24,7 +24,7 @@ typedef void(*udp_server_t_request_handler)();
  *   * udp_SERVER_SYNC - tels the server that it should process
  *   incoming requests in a syncronized way.
  */
-void udp_server_t_create(struct udp_server_t** server, int flags);
+int udp_server_t_create(struct udp_server_t** server, int port);
 
 /**
  * @brief Deallocate and destroys a udp_server_t structure.
@@ -33,13 +33,6 @@ void udp_server_t_create(struct udp_server_t** server, int flags);
  */
 void udp_server_t_destroy(struct udp_server_t* server);
 
-/**
- * @brief Bind a initialized struct udp_server_t to a port in the host machine
- * 
- * @param server The server structure.
- * @param port The port that the server should listen.
- */
-void udp_server_t_bind_to_port(struct udp_server_t* server, int port);
 
 /**
  * @brief Stops a server.
@@ -58,13 +51,6 @@ void udp_server_t_terminate(struct udp_server_t* server);
 long udp_server_t_receice(struct udp_server_t* server, void* buffer, int* len);
 
 
-/**
- * @brief Set the request handler of a server.
- * 
- * @param server The server object.
- * @param handler The handler function pointer.
- */
-void udp_server_t_set_request_handler(struct udp_server_t* server, udp_server_t_request_handler handler);
 
 /**
  * @brief Sends a message to a connected tcp client.
@@ -82,13 +68,6 @@ void udp_send_message_to_client(int client, const char* message);
  */
 void udp_server_t_disconnect_client(struct udp_server_t* server, int client);
 
-/**
- * @brief Sets the message that will be send to the client before it gets disconnected.
- * 
- * @param server The server object.
- * @param message The kill message.
- */
-void udp_server_t_set_disconnect_message(struct udp_server_t* server, const char* message);
 
 
 #endif

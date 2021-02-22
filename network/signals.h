@@ -1,7 +1,0 @@
-#ifndef NETWORK_SIGNALS_H
-#define NETWORK_SIGNALS_H
-
-#define SERVER_FAILURE 0
-#define SERVER_SUCCESS 1
-
-#endif

@@ -5,93 +5,42 @@
 
 #include "network/tcp_server.h"
 #include "network/udp_server.h"
-#include "network/signals.h"
 
 #include "signals.h"
 #include "sliding_window.h"
-
-#define PORT_RANGE_START 1400
-#define PORT_RANGE_END 65535
-
-typedef struct {
-    int ports[PORT_RANGE_END - PORT_RANGE_START];
-    int i;
-    int j;
-} available_ports;
-
-void init_available_ports(available_ports* buffer)
-{
-    buffer->i = 0;
-    buffer->j = 1;
-
-    for(int i=0; i<PORT_RANGE_END - PORT_RANGE_START; i++)
-        buffer->ports[i] = i + PORT_RANGE_START;
-}
-
-int alloc_port(available_ports* buffer)
-{
-    if(buffer->j == buffer->i) return -1;
-
-    int port = buffer->ports[buffer->j];
-    buffer->ports[buffer->j] = -1;
-    buffer->j = (buffer->j+1)%PORT_RANGE_END - PORT_RANGE_START;
-
-    return port;
-}
-
-void free_port(available_ports* buffer, int port)
-{
-    buffer->ports[buffer->i] = port;
-    buffer->i = (buffer->i+1)%PORT_RANGE_END - PORT_RANGE_START;
-}
-
-available_ports ports;
 
 
 int hello(tcp_connection_t* connection, receive_fn receive, write_fn write)
 {
     // This function is responsable for create the udp server that will
     // receive the client data.
-    int udp_port = alloc_port(&ports);
-    if(udp_port == -1) 
-    {
-        // Error
-    }
 
     udp_server_t* udp_server = NULL;
+    int udp_port = udp_server_t_create(&udp_server, 0);
     printf("[UDP]: port='%i'\n", udp_port);
-
-    udp_server_t_create(&udp_server, 0);
-    udp_server_t_bind_to_port(udp_server, udp_port);
 
     // Build the connection responses
     char connection_response[6];
-
-    // memset(connection_response, MESSAGE_CONNECTION, sizeof(short));
-    // memset(&connection_response[2], udp_port, sizeof(int));
     *((short*)&connection_response[0])  = MESSAGE_CONNECTION;
     *((int*)&connection_response[2])    = udp_port;
-
     write(connection, connection_response, 6);
 
     char file_info[25];
 
     receive(connection, file_info, 25);
 
-    short type      = *((short*)&file_info[0]);
-    
+    short type = *((short*)&file_info[0]);
     if(type != 3)
     {
         printf("Invalid response '%i' from server!\n", type);
         exit(-1);
     }
-
     char* arquivo    = ((char*)&file_info[2]);
     long file_size       = *((long*)&file_info[17]);
 
     long frame_size = 1000;
     long frame_count = (long)ceil(file_size/(float)frame_size);
-    
+
     printf("[FILE INFO]: arquivo='%s'\n", arquivo);
     printf("[FILE INFO]: file size='%li'\n", file_size);
 
@@ -99,6 +48,7 @@ int hello(tcp_connection_t* connection, receive_fn receive, write_fn write)
 
     char* filepath = (char*)malloc(strlen(arquivo) + strlen("database/"));
     sprintf(filepath, "%s/%s", "database", arquivo);
+    printf("[FILE INFO]: output='%s'\n", filepath);
     sliding_window_create(&window, filepath, frame_count);
     free(filepath);
 
@@ -108,17 +58,22 @@ int hello(tcp_connection_t* connection, receive_fn receive, write_fn write)
 
 
     // RECEIVE DATA: TODO
+    char buffer [2048];
+    int len;
+
     while(!sliding_window_eof(window))
     {
-        char buffer[1008];
-        int len;
+    
+
+        printf("================== experando\n");
         int received = udp_server_t_receice(udp_server, buffer, &len);
-        
+        printf("================== recebi\n");
+    
         short type = *((short*)&buffer[0]);
 
         if(type != 6)
         {
-            printf("Invalid response '%i' from server!\n", type);
+            printf("Invalid response '%i' from client!\n", type);
             exit(-1);
         }
 
@@ -126,8 +81,9 @@ int hello(tcp_connection_t* connection, receive_fn receive, write_fn write)
         short payload_size = *((short*)&buffer[6]);
 
         char string[payload_size];
-
+        printf("A %i\n", payload_size);
         sliding_window_ack_frame(window, sequence, &buffer[8], payload_size);
+        printf("B %i\n", payload_size);
 
         char ack[6];
 
@@ -137,13 +93,18 @@ int hello(tcp_connection_t* connection, receive_fn receive, write_fn write)
         write(connection, ack, 6);
     }
 
+    // free(buffer);
+
     sliding_window_destroy(window);
 
     short fim = 5;
+
     write(connection, &fim, sizeof(short));
+
     printf("[FIM]: dados recebidos!\n");
 
-    return SERVER_SUCCESS;
+    udp_server_t_destroy(udp_server);
+    return 1;
 }
 
 
@@ -151,10 +112,18 @@ int server_handler(tcp_connection_t* conn, receive_fn receive, write_fn write)
 {
     short type;
     receive(conn, &type, sizeof(short));
+    printf("%i\n", type);
+    printf("%p\n", conn);
 
-    if(type == MESSAGE_HELLO) return hello(conn, receive, write);
+    if(type == MESSAGE_HELLO) {
+        hello(conn, receive, write);
+    }
+    else
+        printf("Invalid code from client!\n");
 
-    return SERVER_FAILURE;
+    tcp_server_t_disconnect_client(conn);
+    printf("TERMINOU\n");
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -165,11 +134,9 @@ int main(int argc, char *argv[]) {
     }
 
     int port = atoi(argv[1]);
-    init_available_ports(&ports);
 
     tcp_server_t* server = NULL;
-    tcp_server_t_create(&server, server_handler, TCP_SERVER_NONE);
-    tcp_server_t_bind_to_port(server, port);
+    tcp_server_t_create(&server, server_handler, port);
     tcp_server_t_start(server);
     tcp_server_t_destroy(server);
 

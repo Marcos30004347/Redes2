@@ -5,10 +5,11 @@
 
 #include "network/tcp_client.h"
 #include "network/udp_client.h"
-#include "network/signals.h"
 
 #include "signals.h"
 #include "sliding_cache.h"
+
+
 
 int main(int argc, char *argv[]) {
     if(argc < 3) 
@@ -21,6 +22,44 @@ int main(int argc, char *argv[]) {
     int port = atoi(argv[2]);
     
     char* arquivo = argv[3];
+
+    char* archive_name = malloc(strlen(arquivo) + 1);
+    memcpy(archive_name, arquivo, strlen(arquivo) + 1);
+
+    if(strlen(archive_name) > 15)
+    {
+        printf("[Error]: O nome do arquivo tem mais de 15 caracteres!\n");
+        exit(-1);
+    }
+
+    const char s[2] = ".";
+
+    char *token, *suffix;
+    
+    token = strtok(archive_name, s);
+
+    int i = 0;
+
+    while( token != NULL ) {
+        i++;
+        suffix = token;
+        token = strtok(NULL, s);
+    }
+
+    if(i > 2)
+    {
+        printf("[Error]: O nome do arquivo tem multiplos '.'!\n");
+        exit(-1);
+    }
+
+    if(strlen(suffix) != 3)
+    {
+        printf("[Error]: O suffixo do arquivo tem menos de 3 caracteres!\n");
+        exit(-1); 
+    }
+
+    free(archive_name);
+
     FILE* file = fopen(arquivo,"rb");
     fseek(file, 0L, SEEK_END);
     long size = ftell(file);
@@ -46,6 +85,10 @@ int main(int argc, char *argv[]) {
     
     char info_file[25];
     *((short*)&info_file[0]) = MESSAGE_INFO_FILE;
+    printf("%li\n", size);
+    printf("%li\n", strlen(arquivo));
+    printf("%s\n", (arquivo));
+
     memcpy(&info_file[2], arquivo, strlen(arquivo) + 1);
     *((long*)&info_file[17]) = size;
     
@@ -66,6 +109,8 @@ int main(int argc, char *argv[]) {
 
 
     struct udp_client_t* udp_client = NULL;
+    printf("port %i\n", udp_port);
+    printf("arquivo %s\n", arquivo);
     udp_client_t_create(&udp_client, url, udp_port);
 
     long frame_size = 1000;
@@ -95,8 +140,9 @@ int main(int argc, char *argv[]) {
     
             fseek(file, (window->head + i)*1000, SEEK_SET);
             fread(&dados[8], sizeof(char), payload_size, file);
-        
+            // printf("enviando\n");
             udp_client_t_send(udp_client, dados, 8+payload_size);
+            // printf("enviei!\n");
         }
 
         char ack[6];

@@ -1,11 +1,6 @@
 #ifndef NETWORK_TCP_SERVER_H
 #define NETWORK_TCP_SERVER_H
 
-
-#define TCP_SERVER_NONE 1 << 0
-#define TCP_SERVER_SYNC 1 << 2
-
-
 /**
  * @brief The TCP Server structure.
  * 
@@ -40,7 +35,7 @@ typedef int(*tcp_server_t_handler)(tcp_connection_t*, receive_fn, write_fn);
  *   * TCP_SERVER_SYNC - tels the server that it should process
  *   incoming requests in a syncronized way.
  */
-void tcp_server_t_create(struct tcp_server_t** server, tcp_server_t_handler handler, int flags);
+void tcp_server_t_create(struct tcp_server_t** server,  tcp_server_t_handler handler, int port);
 /**
  * @brief Deallocate and destroys a tcp_server_t structure.
  * 
@@ -73,11 +68,10 @@ void tcp_server_t_start(struct tcp_server_t* server);
 /**
  * @brief Disconnect a client from the server.
  * 
- * @param server The server that is holding the connection.
- * @param client The id of the client that should be disconnected.
  */
-void tcp_server_t_disconnect_client(struct tcp_server_t* server, int client);
+void tcp_server_t_disconnect_client(struct tcp_connection_t* server);
 
 
+int tcp_connection_t_get_id(struct tcp_connection_t* connection);
 
 #endif

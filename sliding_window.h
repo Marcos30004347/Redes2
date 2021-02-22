@@ -15,8 +15,8 @@ typedef struct {
     
     // file stuff
     FILE* file;
-    char* buffer[64];
-    long size[64];
+    char** buffer;
+    long* size;
 } sliding_window;
 
 void showbits( unsigned long x )
@@ -39,6 +39,8 @@ void print_sliding_window(sliding_window* sliding)
 void sliding_window_create(sliding_window** sliding, const char* filename, long frame_count)
 {
     *sliding = (sliding_window*)malloc(sizeof(sliding_window));
+    (*sliding)->buffer = (char**)malloc(sizeof(char*)*64);
+    (*sliding)->size = (long*)malloc(sizeof(long)*64);
     (*sliding)->frame_count = frame_count;
     (*sliding)->window = 0;
     (*sliding)->head = 0;
@@ -48,6 +50,7 @@ void sliding_window_create(sliding_window** sliding, const char* filename, long 
     for(int i=0; i<64; i++)
     {
         (*sliding)->buffer[i] = (char*)malloc(sizeof(char)*1000);
+        (*sliding)->size[i] = 0;
     }
 }
 
@@ -74,21 +77,28 @@ void sliding_window_ack_frame(sliding_window* sliding, long frame, const char* p
     if(check_mask & sliding->window) return;
 
     sliding->window |= 1L << (frame % 64);
-
+    printf("frame=%li\n", frame);
     memcpy(sliding->buffer[frame % 64], payload, len);
+    // printf("2\n");
     sliding->size[frame % 64] = len;
+    // printf("3\n");
 
-    print_sliding_window(sliding);
+    // print_sliding_window(sliding);
 
     unsigned long mask = 1L << (sliding->head % 64);
 
     while(mask & sliding->window) {
+        printf("4\n");
+        printf("4 %li\n", sliding->head % 64);
+        // printf("4 %s\n", sliding->buffer[sliding->head % 64]);
+
         fwrite(
             sliding->buffer[sliding->head % 64],
             sizeof(char),
             sliding->size[frame % 64],
             sliding->file
         );
+        printf("5\n");
 
         sliding->window &= ~mask;
         sliding->head = sliding->head + 1;

@@ -1,3 +1,4 @@
+#include "utils.h"
 #include "tcp_client.h"
 
 #include <netinet/in.h> 
@@ -6,20 +7,29 @@
 #include <stdlib.h>
 #include <stdio.h> 
 #include <arpa/inet.h>
-#include <strings.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/select.h>
 #include <fcntl.h>
-
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 typedef void(*client_handler)(struct tcp_client_t*, char*);
 
 struct tcp_client_t
 {
-    struct sockaddr_in server_adress;
     int client_fd;
 	client_handler on_receive;
 };
+
+
+int addrparse(const char *addrstr, int port, struct sockaddr_storage *storage) {
+    if (addrstr == NULL) {
+        return -1;
+    }
+
+    return -1;
+}
 
 
 int tcp_client_t_receive(struct tcp_client_t* client, void* message, int length)
@@ -55,25 +65,89 @@ void tcp_client_t_create(struct tcp_client_t** client, const char* url, int port
     *client = (struct tcp_client_t*)malloc(sizeof(struct tcp_client_t));
     struct tcp_client_t* c = *client;
 
-    c->client_fd = socket(AF_INET, SOCK_STREAM, 0);
+    printf("url: %s\n", url);
+	// struct in6_addr serveraddr;
+	// struct sockaddr_storage addr;
 
-    if (c->client_fd == -1) { 
-		printf("socket creation failed...\n"); 
-		exit(0); 
-	}
+    // if (inet_pton(AF_INET, url, (struct in_addr *)&addr)) {
+	// 	c->client_fd = socket(AF_INET, SOCK_STREAM, 0);
+	// 	if (c->client_fd == -1) { 
+	// 		printf("socket creation failed...\n"); 
+	// 		exit(0); 
+	// 	}
+	// 	struct sockaddr_in * _addr = (struct sockaddr_in *)&(addr);
+	// 	_addr->sin_family = AF_INET; 
+	// 	_addr->sin_addr.s_addr = inet_addr(url); 
+	// 	_addr->sin_port = htons(port); 
 
-    c->server_adress.sin_family = AF_INET; 
-	c->server_adress.sin_addr.s_addr = inet_addr(url); 
-	c->server_adress.sin_port = htons(port); 
+	// 	int conn = connect(c->client_fd, (struct sockaddr *)_addr, sizeof(*_addr));
+	// 	if (conn != 0){
+	// 		printf("connection with the server failed with %i...\n", conn); 
+	// 		exit(0); 
+	// 	}
 
-	int conn = connect(c->client_fd, (struct sockaddr *)&c->server_adress, sizeof(c->server_adress));
-	if (conn != 0){
-		printf("connection with the server failed with %i...\n", conn); 
-		exit(0); 
-	}
+	// 	int flags = fcntl(c->client_fd, F_GETFL);
+	// 	fcntl(c->client_fd, F_SETFL ,flags | O_NONBLOCK);
+	// } else {
+		// if (inet_pton(AF_INET6, url, (struct in6_addr *)&(c->server_adress.sin_addr))) {
+		printf("IPv6\n");
 
-	int flags = fcntl(c->client_fd, F_GETFL);
-	fcntl(c->client_fd, F_SETFL ,flags | O_NONBLOCK);
+		struct in6_addr serveraddr;
+		struct addrinfo hints, *res=NULL;
+		
+		memset(&hints, 0x00, sizeof(hints));
+		
+		hints.ai_flags    = AI_NUMERICSERV;
+		hints.ai_family   = AF_UNSPEC;
+		hints.ai_socktype = SOCK_STREAM;
+
+		int rc = inet_pton(AF_INET, url, &serveraddr);
+	
+		if (rc == 1)    /* valid IPv4 text address? */
+		{
+			hints.ai_family = AF_INET;
+			hints.ai_flags |= AI_NUMERICHOST;
+		}
+		else
+		{
+			rc = inet_pton(AF_INET6, url, &serveraddr);
+			if (rc == 1) /* valid IPv6 text address? */
+			{
+
+				hints.ai_family = AF_INET6;
+				hints.ai_flags |= AI_NUMERICHOST;
+			}
+		}
+	
+		char sport[10];
+		itoa(port, sport, 10);
+
+		rc = getaddrinfo(url, sport, &hints, &res);
+		if (rc != 0)
+		{
+			printf("Host not found --> %s\n", gai_strerror(rc));
+			if (rc == EAI_SYSTEM)
+				perror("getaddrinfo() failed");
+		}
+
+		c->client_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+
+		if (c->client_fd == -1) { 
+			printf("socket creation failed...\n"); 
+			exit(0); 
+		}
+
+		int conn = connect(c->client_fd, res->ai_addr, res->ai_addrlen);
+
+		if (conn != 0){
+			printf("connection with the server failed with %i...\n", conn); 
+			exit(0); 
+		}
+
+		// int flags = fcntl(c->client_fd, F_GETFL);
+		// fcntl(c->client_fd, F_SETFL ,flags | O_NONBLOCK);
+	// }
+
 }
 
 void tcp_client_t_destroy(struct tcp_client_t* client)

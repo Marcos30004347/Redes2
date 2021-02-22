@@ -88,7 +88,7 @@ void sliding_cache_ack_frame(sliding_cache* sliding, long frame)
 
     sliding->window |= 1L << (frame % 64);
 
-    print_sliding_cache(sliding);
+    // print_sliding_cache(sliding);
 
     unsigned long mask = 1L << (sliding->head % 64);
 
