@@ -1,23 +1,5 @@
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
-#include <stdio.h>
-#include <string.h>
-
-
-typedef struct {
-    // window
-    unsigned long frame_count;
-    unsigned long window;
-    unsigned long head;
-    
-    // file stuff
-    FILE* file;
-    char** buffer;
-    long* size;
-} sliding_window;
+#include "sliding_window.h"
 
 void showbits( unsigned long x )
 {

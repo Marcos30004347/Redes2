@@ -132,13 +132,11 @@ struct connection_t udp_server_t_accept_connection(struct udp_server_t* server)
     return conn;
 }
 
-long udp_server_t_receice(struct udp_server_t* server, void* buffer, int* len) 
+long udp_server_t_receice(struct udp_server_t* server, void* buffer) 
 {
+    int* len;
     struct sockaddr_in cliaddr;
-    printf("asdasdasd\n");
     long resp = recvfrom(server->server_fd, buffer, 1024, MSG_WAITALL, ( struct sockaddr *) &cliaddr, len); 
-    printf("asdasdasd %i\n", *len);
-    printf("asdasdasd %li\n", resp);
     return resp;
 }
 

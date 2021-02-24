@@ -48,7 +48,7 @@ void udp_server_t_terminate(struct udp_server_t* server);
 //  */
 // void udp_server_t_start(struct udp_server_t* server);
 
-long udp_server_t_receice(struct udp_server_t* server, void* buffer, int* len);
+long udp_server_t_receice(struct udp_server_t* server, void* buffer);
 
 
 

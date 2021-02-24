@@ -1,6 +1,5 @@
 #include "tcp_server.h"
 
-#include "signals.h"
 #include "async.h"
 
 #include <netinet/in.h> 
@@ -11,11 +10,6 @@
 #include <stdio.h> 
 #include <string.h> 
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 struct connection_node_t {
     int                             client;
@@ -49,12 +43,12 @@ struct tcp_server_t {
 
 
 
-long receive_from_connection(tcp_connection_t* con, void* buffer, int len) 
+long connection_read(tcp_connection_t* con, void* buffer, int len) 
 {
     return read(con->client_fd, buffer, len);
 }
 
-long write_to_connection(tcp_connection_t* con, void* buffer, int len) 
+long connection_write(tcp_connection_t* con, void* buffer, int len) 
 {
     write(con->client_fd, buffer, len); 
 }
@@ -66,7 +60,7 @@ void* tcp_server_t_client_handler(void* _data)
     connection.client_fd    = data->connfd;
     connection.server       = data->server;
 
-    data->server->handler(&connection, receive_from_connection, write_to_connection);
+    data->server->handler(&connection);
 
     free(data);
 
@@ -99,32 +93,6 @@ void tcp_server_t_hold_connection(struct tcp_server_t* server, struct connection
     conn->thread = thread;
     conn->client = connection.client_fd;
 }
-void reverse(char s[])
-{
-    int i, j;
-    char c;
-
-    for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
-        c = s[i];
-        s[i] = s[j];
-        s[j] = c;
-    }
-}  
-void itoa(int n, char s[])
-{
-    int i, sign;
-
-    if ((sign = n) < 0)  /* record sign */
-        n = -n;          /* make n positive */
-    i = 0;
-    do {       /* generate digits in reverse order */
-        s[i++] = n % 10 + '0';   /* get next digit */
-    } while ((n /= 10) > 0);     /* delete it */
-    if (sign < 0)
-        s[i++] = '-';
-    s[i] = '\0';
-    reverse(s);
-}  
 
 void tcp_server_t_create(struct tcp_server_t** server,  tcp_server_t_handler handler, int port)
 {
@@ -133,44 +101,33 @@ void tcp_server_t_create(struct tcp_server_t** server,  tcp_server_t_handler han
 
     *server = (struct tcp_server_t*)malloc(sizeof(struct tcp_server_t));
     
-    // struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&(*server)->address;
-    
-    
-    struct addrinfo hints, *res;
-    memset(&hints, 0, sizeof hints);
+    struct sockaddr_in6 *addr = (struct sockaddr_in6 *)&(*server)->address;
 
-    hints.ai_family = AF_UNSPEC; // use IPv4 or IPv6, whichever
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-
-    char snum[5];
-
-    itoa(port, snum);
-    printf("%s\n",snum);
-
-    if (0 != getaddrinfo(NULL, snum, &hints, &res))
-    {
-        printf("asdasdasdasd\n");
-        exit(-1);
-    }
-
-    (*server)->server_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    setsockopt((*server)->server_fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&no, sizeof(no)); 
-    setsockopt((*server)->server_fd, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr));
- 
-    (*server)->connections = NULL;
-    (*server)->handler = handler;
-
-    // addr6->sin6_family = AF_INET6;
-    // addr6->sin6_port = htons(port);
-    // addr6->sin6_addr = in6addr_any;
+    (*server)->server_fd = socket(AF_INET6, SOCK_STREAM, 0);
 
     if ((*server)->server_fd == -1) { 
         printf("[ERROR]: criacao do socket falhou!\n"); 
         exit(0); 
     }
 
-    if ((bind((*server)->server_fd, res->ai_addr, res->ai_addrlen) != 0)) { 
+    setsockopt((*server)->server_fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&no, sizeof(no)); 
+    if (setsockopt((*server)->server_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuseaddr,sizeof(reuseaddr)) < 0)
+    {
+        perror("setsockopt(SO_REUSEADDR) failed");
+        exit(-1);
+    }
+
+    memset(addr, 0, sizeof(*addr));
+
+    addr->sin6_family = AF_INET6;
+    addr->sin6_port = htons(port);
+    addr->sin6_addr = in6addr_any;
+
+    (*server)->connections = NULL;
+    (*server)->handler = handler;
+
+
+    if ((bind((*server)->server_fd, (struct sockaddr *)addr, sizeof(*addr)) != 0)) { 
         printf("socket bind failed...\n"); 
         exit(0); 
     } 
@@ -204,13 +161,14 @@ struct connection_t tcp_server_t_accept_connection(struct tcp_server_t* server)
 
 void tcp_server_t_start(struct tcp_server_t* server)
 {
-    if ((listen(server->server_fd, 5)) != 0) { 
+    if ((listen(server->server_fd, 10)) != 0) { 
         printf("[ERROR]: Nao foi possivel escutar\n"); 
         exit(0); 
     }
 
     printf("listening...\n");
     struct connection_t connection = tcp_server_t_accept_connection(server);
+    printf("connection!\n");
 
     while(connection.client_fd != -1)
     {

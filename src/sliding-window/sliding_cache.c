@@ -1,40 +1,4 @@
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
-#include <stdio.h>
-#include <string.h>
-
-
-// char lookup[16][5] = { 
-//     "0000", "0001", "0010", "0011", \
-//     "0100", "0101", "0110", "0111", \
-//     "1000", "1001", "1010", "1011", \
-//     "1100", "1101", "1110", "1111" };
-
-// int print(long input) {
-//     char output[64];
-
-//     sprintf(output, "%lX", input);
-//     int len = strlen(output);
-//     printf("%ld = 0x%lx = ", input, input);
-//     for(int i=0; i<len; i++) {
-//         if (output[i] > '9') output[i] = output[i] - 'A' + 10;
-//         else output[i] = output[i] - '0'; // ASCII fuckery
-//         printf("%s", lookup[output[i]]);
-//     }
-
-//     printf("\n");
-//     return 0;
-// }
-
-typedef struct {
-    // window
-    unsigned long frame_count;
-    unsigned long window;
-    unsigned long head;
-} sliding_cache;
+#include "sliding_cache.h"
 
 void showbits( unsigned long x )
 {
