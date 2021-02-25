@@ -11,76 +11,48 @@
 #include <string.h> 
 #include <unistd.h>
 
-struct connection_node_t {
+struct connection_node {
     int                             client;
-    struct thread_t*                thread;
+    struct thread*                thread;
     
-    struct connection_node_t*       next;
-    struct connection_node_t*       prev;
+    struct connection_node*       next;
+    struct connection_node*       prev;
 };
 
-struct connection_t {
+struct connection {
     int                             client_fd;
     struct sockaddr_in              client_address;
 };
 
 struct thread_data {
-    struct udp_server_t*            server;
+    struct udp_server*            server;
     int                             connfd;
 };
 
-struct udp_server_t {
+struct udp_server {
     int                             server_fd;
     struct sockaddr_storage         address;
-    struct connection_node_t*       connections;
+    struct connection_node*       connections;
 };
 
-int udp_server_t_create(struct udp_server_t** server, int port)
+struct udp_server* udp_server_create(int port)
 {
-    // *server = (struct udp_server_t*)malloc(sizeof(struct udp_server_t));
-    
-    // struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)&(*server)->address;
-    // addr6->sin6_family = AF_INET6;
-    // addr6->sin6_addr = in6addr_any;
-    // addr6->sin6_port = htons(port);
-
-    // (*server)->kill_message = NULL;
-    // (*server)->server_fd = socket((*server)->address.ss_family, SOCK_DGRAM, 0);
-    // (*server)->request_handler = NULL;
-    // (*server)->connections = NULL;
-    
-    // int no = 0;     
-    // setsockopt((*server)->server_fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&no, sizeof(no)); 
-    
-    // if ((*server)->server_fd == -1) { 
-    //     printf("[ERRORÇ: criacao do socket falhou!\n"); 
-    //     exit(0); 
-    // }
-
-    // if ((bind((*server)->server_fd, (struct sockaddr*)&(*server)->address, sizeof((*server)->address))) != 0) { 
-    //     printf("socket bind failed...\n"); 
-    //     exit(0); 
-    // }
-
-    // getsockname((*server)->server_fd, (struct sockaddr *)(&(*server)->address), &udpaddrlen);
-
-
     int no = 0;
     int reuseaddr = 1;
 
-    *server = (struct udp_server_t*)malloc(sizeof(struct udp_server_t));
+    struct udp_server* server = (struct udp_server*)malloc(sizeof(struct udp_server));
     
-    struct sockaddr_in6 *addr = (struct sockaddr_in6 *)&(*server)->address;
+    struct sockaddr_in6 *addr = (struct sockaddr_in6 *)&server->address;
 
-    (*server)->server_fd = socket(AF_INET6, SOCK_DGRAM, 0);
+    server->server_fd = socket(AF_INET6, SOCK_DGRAM, 0);
 
-    if ((*server)->server_fd == -1) { 
+    if (server->server_fd == -1) { 
         printf("[ERROR]: criacao do socket falhou!\n"); 
         exit(0); 
     }
 
-    setsockopt((*server)->server_fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&no, sizeof(no)); 
-    if (setsockopt((*server)->server_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuseaddr,sizeof(reuseaddr)) < 0)
+    setsockopt(server->server_fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&no, sizeof(no)); 
+    if (setsockopt(server->server_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuseaddr,sizeof(reuseaddr)) < 0)
     {
         perror("setsockopt(SO_REUSEADDR) failed");
         exit(-1);
@@ -92,22 +64,26 @@ int udp_server_t_create(struct udp_server_t** server, int port)
     addr->sin6_port = htons(port);
     addr->sin6_addr = in6addr_any;
 
-    (*server)->connections = NULL;
+    server->connections = NULL;
 
-    if (bind((*server)->server_fd, (struct sockaddr *)addr, sizeof(*addr)) != 0) { 
+    if (bind(server->server_fd, (struct sockaddr *)addr, sizeof(*addr)) != 0) { 
         printf("socket bind failed...\n"); 
         exit(0); 
     } 
 
-    socklen_t udpaddrlen = sizeof((*server)->address);
-    getsockname((*server)->server_fd, (struct sockaddr *)(&(*server)->address), &udpaddrlen);
-
-    return ntohs(((struct sockaddr_in6 *)(&(*server)->address))->sin6_port);
+   return server;
 }
 
-void udp_server_t_destroy(struct udp_server_t* server)
+int udp_server_get_port(struct udp_server* server) {
+    socklen_t udpaddrlen = sizeof(server->address);
+    getsockname(server->server_fd, (struct sockaddr *)(&server->address), &udpaddrlen);
+    return ntohs(((struct sockaddr_in6 *)(&server->address))->sin6_port);
+}
+
+
+void udp_server_destroy(struct udp_server* server)
 {
-    struct connection_node_t * tmp;
+    struct connection_node * tmp;
     while (server->connections)
     {
         tmp = server->connections;
@@ -116,7 +92,7 @@ void udp_server_t_destroy(struct udp_server_t* server)
         if(server->connections)
             server->connections->next = NULL;
 
-        thread_t_destroy(tmp->thread);
+        thread_destroy(tmp->thread);
         free(tmp);
     }
 
@@ -124,53 +100,33 @@ void udp_server_t_destroy(struct udp_server_t* server)
     free(server);
 }
 
-struct connection_t udp_server_t_accept_connection(struct udp_server_t* server)
+struct connection udp_server_accept_connection(struct udp_server* server)
 {
-    struct connection_t conn;
+    struct connection conn;
     socklen_t len = sizeof(conn.client_address); 
     conn.client_fd = accept(server->server_fd, (struct sockaddr*)&conn.client_address, &len); 
     return conn;
 }
 
-long udp_server_t_receice(struct udp_server_t* server, void* buffer) 
+long udp_server_receice(struct udp_server* server, char* buff) 
 {
-    int* len;
+    int len;
     struct sockaddr_in cliaddr;
-    long resp = recvfrom(server->server_fd, buffer, 1024, MSG_WAITALL, ( struct sockaddr *) &cliaddr, len); 
+    long resp = recvfrom(server->server_fd, buff, 1008, MSG_WAITALL, (struct sockaddr *) &cliaddr, &len); 
     return resp;
 }
 
 
-void udp_server_t_terminate(struct udp_server_t* server)
+void udp_servererminate(struct udp_server* server)
 {
     close(server->server_fd);
 }
 
 
-void udp_send_message_to_client(int client, const char* message)
+void udp_send_messageo_client(int client, const char* message)
 {
     struct sockaddr_in servaddr, cliaddr; 
     int len;
     sendto(client, message, strlen(message), MSG_CONFIRM, (const struct sockaddr *) &cliaddr, len); 
-}
-
-void udp_server_t_disconnect_client(struct udp_server_t* server, int client)
-{
-    // struct connection_node_t ** connections = &server->connections;
-    // while ((*connections) && (*connections)->client!=client)
-    //     (*connections) = (*connections)->next;
-    
-    // if((*connections) && (*connections)->client == client)
-    // {
-    //     if((*connections)->prev) (*connections)->prev->next = (*connections)->next;
-    //     if((*connections)->next) (*connections)->next->prev = (*connections)->prev;
-
-    //     if(server->kill_message)
-    //         udp_send_message_to_client(client, server->kill_message);
-
-    //     thread_t_destroy((*connections)->thread);
-    //     free((*connections));
-    //     *connections = NULL;
-    // }
 }
 

@@ -9,124 +9,128 @@
 #include "signals.h"
 
 #include "sliding-window/buffer.h"
-#include "sliding-window/sliding_window.h"
+#include "sliding-window/receiving_window.h"
 
-void verify_message_code(buffer* buff, short response) {
-    if(*(short*)buffer_get(buff, 0) != response)
-    {
+#define FRAME_SIZE 1000
+
+void verify_client_message_code(short* buff, short response) {
+    short value = *buff;
+    if(value != response) {
         printf(
             "Invalid response '%i' from client, should be '%i'!\n",
-            *(short*)buffer_get(buff, 0),
+            value,
             response
         );
         exit(-1);
     }
+
 }
 
-int hello(tcp_connection_t* connection)
+int hello(tcp_connection* connection)
 {
-    sliding_window* window      = NULL;
-    udp_server_t* udp_server    = NULL;
-    
+    receiving_window* window = NULL;
+    udp_server* udp_server = udp_server_create(0);;
+
     short conn_resp = 2;
-    short ok_resp = 4;
-    short end_resp = 5;
+    short ok_resp   = 4;
+    short end_resp  = 5;
+    short ack_resp  = 7;
 
-    int udp_port = udp_server_t_create(&udp_server, 0);
+    int udp_port = udp_server_get_port(udp_server);
 
+    // Intermediate buffers
     buffer* conn_buff   = buffer_create(6);
     buffer* file_buff   = buffer_create(25);
     buffer* ok_buff     = buffer_create(2);
+    buffer* win_buff    = buffer_create(2048);
     buffer* end_buff    = buffer_create(2);
-    buffer* win_buff    = buffer_create(2024);
+    buffer* ack_buff    = buffer_create(6);
 
     buffer_set(conn_buff, 0, &conn_resp, sizeof(short));
     buffer_set(conn_buff, 2, &udp_port, sizeof(int));
 
-    connection_write(connection, conn_buff, 6);
+    // Send message to the client telling the UDP port
+    connection_write(connection, buffer_get(conn_buff, 0), 6);
 
-    connection_read(connection, file_buff, 25);
+    // Read the file parameters
+    connection_read(connection, buffer_get(file_buff, 0), 25);
 
-    verify_message_code(file_buff, 3);
+    verify_client_message_code(buffer_get(file_buff, 0), 3);
 
-    char* arquivo       = ((char*)buffer_get(file_buff, 2));
-    long file_size      = *((long*)buffer_get(file_buff, 17));
-    long frame_size     = 1000;
-    long frame_count    = (long)ceil(file_size/(float)frame_size);
+    // Frame params
+    char* file_name  = ((char*)buffer_get(file_buff, 2));
+    long  file_size = *((long*)buffer_get(file_buff, 17));
 
-    char* filepath = (char*)malloc(strlen(arquivo) + strlen("database/"));
 
-    sprintf(filepath, "%s/%s", "output", arquivo);
-    sliding_window_create(&window, filepath, frame_count);
-
+    // Start the sliding window data structures
+    char* filepath = (char*)malloc(strlen("teste.txt") + strlen("database/"));
+    sprintf(filepath, "%s/%s", "output", "teste.txt");
+    receiving_window_create(&window, filepath, (long)ceil(file_size/(float)FRAME_SIZE));
     free(filepath);
 
+    // Send message to the client telling that it can start sendind frames
     buffer_set(ok_buff, 0, &ok_resp, sizeof(short));
-    connection_write(connection, ok_buff, sizeof(short));
+    connection_write(connection, buffer_get(ok_buff, 0), sizeof(short));
 
-    while(!sliding_window_eof(window)) {
-        int received = udp_server_t_receice(udp_server, win_buff);
+    while(!receiving_window_eof(window)) {
+        udp_server_receice(udp_server, buffer_get(win_buff, 0));
+
+        // Verify if the received message start with a '6'
+        verify_client_message_code(buffer_get(win_buff, 0), 6);
+
+        // Get arrived 'sequence' and 'payload size'
+        int sequence        = *(int*)buffer_get(win_buff, 2);
+        short payload_size  = *(short*)buffer_get(win_buff, 6);
     
-        short type = *((short*)&win_buff->buffer[0]);
+        // Save the received frame
+        receiving_window_ack_frame(window, sequence, buffer_get(win_buff, 8), payload_size);
 
-        verify_message_code(win_buff, 6);
-
-        int sequence = *((int*)&win_buff->buffer[2]);
-        short payload_size = *((short*)&win_buff->buffer[6]);
-
-        char string[payload_size];
-        sliding_window_ack_frame(window, sequence, &win_buff->buffer[8], payload_size);
-
-        char ack[6];
-
-        *((short*)&ack) = 7;
-        *((int*)&ack[2]) = sequence;
-
-        connection_write(connection, ack, 6);
+        // Send ACK
+        buffer_set(ack_buff, 0, &ack_resp, sizeof(short));
+        buffer_set(ack_buff, 2, &sequence, sizeof(int));
+        connection_write(connection, buffer_get(ack_buff, 0), 6);
     }
 
-
+    // Set and send the end message, telling that everything have ended as expected
     buffer_set(end_buff, 0, &end_resp, sizeof(short));
-    connection_write(connection, end_buff, sizeof(short));
+    connection_write(connection, buffer_get(end_buff, 0), sizeof(short));
 
+    // Destroy allocated datastructures
     buffer_destroy(conn_buff);
     buffer_destroy(file_buff);
     buffer_destroy(ok_buff);
     buffer_destroy(win_buff);
 
-    udp_server_t_destroy(udp_server);
-    sliding_window_destroy(window);
+    udp_server_destroy(udp_server);
+    receiving_window_destroy(window);
     
     return 1;
 }
 
 
-int server_handler(tcp_connection_t* conn)
+int server_handler(tcp_connection* conn)
 {
     short type;
     connection_read(conn, &type, sizeof(short));
-
     if(type == MESSAGE_HELLO) {
         hello(conn);
     }
 
-    tcp_server_t_disconnect_client(conn);
+    tcp_server_disconnect_client(conn);
     return 0;
 }
 
 int main(int argc, char *argv[]) {
-    if(argc < 2) 
-    {
+    if(argc < 2) {
         printf("Argumentos insuficientes!\n");
         return -1;
     }
 
     int port = atoi(argv[1]);
 
-    tcp_server_t* server = NULL;
-    tcp_server_t_create(&server, server_handler, port);
-    tcp_server_t_start(server);
-    tcp_server_t_destroy(server);
+    tcp_server* server = tcp_server_create(server_handler, port);
+    tcp_server_start(server);
+    tcp_server_destroy(server);
 
     return 0;
 }

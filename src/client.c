@@ -7,8 +7,22 @@
 #include "network/udp_client.h"
 
 #include "signals.h"
-#include "sliding-window/sliding_cache.h"
+#include "sliding-window/buffer.h"
+#include "sliding-window/sending_window.h"
 
+
+void verify_server_message_code(short* buff, short response) {
+    short value = *buff;
+    if(value != response)
+    {
+        printf(
+            "Invalid response '%i' from server, should be '%i'!\n",
+            value,
+            response
+        );
+        exit(-1);
+    }
+}
 
 
 int main(int argc, char *argv[]) {
@@ -60,116 +74,90 @@ int main(int argc, char *argv[]) {
 
     free(archive_name);
 
-    FILE* file = fopen(arquivo,"rb");
-    fseek(file, 0L, SEEK_END);
-    long size = ftell(file);
-    fseek(file, 0L, 0);
+    sending_window* window;
+    sending_window_create(&window, arquivo);
 
-    struct tcp_client_t* client = NULL;
-    tcp_client_t_create(&client, url, port);
+    struct tcp_client* client = tcp_client_create(url, port);
 
-    short hello = 1;
-    tcp_client_t_send(client, &hello, sizeof(short));
+    short hello_msg = 1;
+    short file_msg  = 3;
+    short data_msg  = 6;
+    short ack_msg   = 6;
 
-    char connection[6];
+    buffer* hello_buff  = buffer_create(2);
+    buffer* ack_buff    = buffer_create(6);
+    buffer* conn_buff   = buffer_create(6);
+    buffer* file_buff   = buffer_create(25);
+    buffer* ok_buff     = buffer_create(2);
+    buffer* dados_buff  = buffer_create(1008);
 
-    while(tcp_client_t_receive(client, connection, 6) == 0) {}
 
-    if(*((short*)&connection) != 2)
-    {
-        printf("Invalid response '%i' from server!\n", *((short*)&connection));
-        exit(-1);
-    }
+    buffer_set(hello_buff, 0, &hello_msg, 2);
 
-    int udp_port = *((int*)&connection[2]);
+    tcp_client_send(client, buffer_get(hello_buff, 0), 2);
+
+    tcp_client_receive(client, buffer_get(conn_buff, 0), 6);
+
+    verify_server_message_code(buffer_get(conn_buff,0), 2);
+
+    int udp_port = *(int*)buffer_get(conn_buff, 2);
     
-    char info_file[25];
-    *((short*)&info_file[0]) = MESSAGE_INFO_FILE;
-    printf("%li\n", size);
-    printf("%li\n", strlen(arquivo));
-    printf("%s\n", (arquivo));
+    buffer_set(file_buff, 0, &file_msg, 2);
+    buffer_set(file_buff, 2, arquivo, strlen(arquivo) + 1);
+    buffer_set(file_buff, 17, &window->size, sizeof(long));
 
-    memcpy(&info_file[2], arquivo, strlen(arquivo) + 1);
-    *((long*)&info_file[17]) = size;
-    
-    tcp_client_t_send(client, &info_file, 25);
+    tcp_client_send(client, buffer_get(file_buff, 0), 25);
 
-    short ok;
+    tcp_client_receive(client, buffer_get(ok_buff, 0), 2);
 
-    while(tcp_client_t_receive(client, &ok, 2) == 0) {}
+    verify_server_message_code(buffer_get(ok_buff,0), 4);
 
-    if(ok != 4)
-    {
-        printf("Invalid response '%i' from server!\n", ok);
-        exit(-1);
-    }
+    struct udp_client* udp_client = NULL;
 
-    // Send data
-    printf("Envinando dados...\n");
+    udp_client_create(&udp_client, url, udp_port);
 
+    tcp_client_set_timeout(client, 500);
 
-    struct udp_client_t* udp_client = NULL;
-    printf("port %i\n", udp_port);
-    printf("arquivo %s\n", arquivo);
-    udp_client_t_create(&udp_client, url, udp_port);
-
-    long frame_size = 1000;
-    long frame_count = (long)ceil(size/(float)frame_size);
-    int last = size%frame_size;
-
-    sliding_cache* window;
-    sliding_cache_create(&window, frame_count);
-
-
-    while(!sliding_cache_eof(window))
-    {
-        for(int i=0; i < 32 && window->head + i < frame_count; i++)
-        {
+    while(!sending_window_eof(window)) {
+        for(int i=0; i < WINDOW_SIZE && window->head + i < window->frame_count; i++) {
             int payload_size = 1000;
-            // printf("SENDING %i...\n", window->head + i);
-    
-            if(sliding_cache_has_sended(window, window->head + i)) continue;
-            
-            if(window->head + i == frame_count - 1) payload_size = last;
+            if(sending_window_has_sended(window, window->head + i)) continue;
 
+            if(window->head + i == window->frame_count - 1) payload_size = window->size%FRAME_SIZE;;
             
-            char dados[8+payload_size];
-            *((short*)&dados[0]) = 6;
-            *((int*)&dados[2]) = window->head + i;
-            *((short*)&dados[6]) = payload_size;
-    
-            fseek(file, (window->head + i)*1000, SEEK_SET);
-            fread(&dados[8], sizeof(char), payload_size, file);
-            // printf("enviando\n");
-            udp_client_t_send(udp_client, dados, 8+payload_size);
-            // printf("enviei!\n");
+            int sequence = window->head + i;
+
+            buffer_set(dados_buff, 0, &data_msg, sizeof(short));
+            buffer_set(dados_buff, 2, &sequence, sizeof(int));
+            buffer_set(dados_buff, 6, &payload_size, sizeof(short));
+
+            buffer_set(dados_buff, 8, sending_window_get_data_from_head(window, window->head + i), payload_size);
+            
+            udp_client_send(udp_client, buffer_get(dados_buff,0), 8+payload_size);
         }
-
-        char ack[6];
-        int k = 0;
-        while(!sliding_cache_eof(window) && tcp_client_t_receive(client, ack, 6) && k < 31)
-        {
-            k++;
-            if(*((short*)&ack) != 7)
-            {
-                printf("Invalid response '%i' from server!\n", *((short*)&ack));
-                exit(-1);
-            }
-
     
-            unsigned sequence =*(unsigned*)&ack[2];
-            sliding_cache_ack_frame(window, sequence);
+        int frames = 0;
+
+        while(
+            !sending_window_eof(window)
+            && frames < WINDOW_SIZE - 1
+            && tcp_client_receive(client, buffer_get(ack_buff,0), 6)
+        ) {
+            frames++;
+            verify_server_message_code(buffer_get(ack_buff,0), 7);
+    
+            unsigned sequence = *(unsigned*)buffer_get(ack_buff, 2);
+            sending_window_ack_frame(window, sequence);
         }
     }
 
-    sliding_cache_destroy(window);
+    tcp_client_remove_timeout(client);
 
-    fclose(file);
+    sending_window_destroy(window);
+
     short fim;
 
-    while(tcp_client_t_receive(client, &fim, 2) == 0) {}
-
-    printf("Fim!\n");
+    tcp_client_receive(client, &fim, 2);
 
     if(fim != 5)
     {
