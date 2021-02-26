@@ -23,7 +23,7 @@ typedef struct {
     long framecount;
 } sending_window;
 
-void sending_window_create(sending_window** sliding, const char* filename);
+sending_window* sending_window_create(const char* filename);
 void sending_window_destroy(sending_window* sliding);
 int sending_window_eof(sending_window* sliding);
 int sending_window_has_sended(sending_window* sliding, int i);

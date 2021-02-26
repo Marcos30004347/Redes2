@@ -11,29 +11,29 @@
 #include <string.h> 
 #include <unistd.h>
 
-struct connection_node {
-    int                             client;
-    struct thread*                thread;
+typedef struct connection_node {
+    int                    client;
+    thread*                thread;
     
     struct connection_node*       next;
     struct connection_node*       prev;
-};
+} connection_node;
 
-struct connection {
+typedef struct connection {
     int                             client_fd;
     struct sockaddr_in              client_address;
-};
+} connection;
 
-struct thread_data {
-    struct udp_server*            server;
-    int                             connfd;
-};
+typedef struct thread_data {
+    udp_server* server;
+    int         connfd;
+} thread_data;
 
-struct udp_server {
-    int                             server_fd;
-    struct sockaddr_storage         address;
-    struct connection_node*       connections;
-};
+typedef struct udp_server {
+    int                     server_fd;
+    struct sockaddr_storage address;
+    connection_node*        connections;
+} udp_server;
 
 struct udp_server* udp_server_create(int port)
 {
@@ -100,16 +100,14 @@ void udp_server_destroy(struct udp_server* server)
     free(server);
 }
 
-struct connection udp_server_accept_connection(struct udp_server* server)
-{
-    struct connection conn;
+connection udp_server_accept_connection(udp_server* server) {
+    connection conn;
     socklen_t len = sizeof(conn.client_address); 
     conn.client_fd = accept(server->server_fd, (struct sockaddr*)&conn.client_address, &len); 
     return conn;
 }
 
-long udp_server_receice(struct udp_server* server, char* buff) 
-{
+long udp_server_receice(udp_server* server, char* buff)  {
     int len;
     struct sockaddr_in cliaddr;
     long resp = recvfrom(server->server_fd, buff, 1008, MSG_WAITALL, (struct sockaddr *) &cliaddr, &len); 
@@ -117,14 +115,7 @@ long udp_server_receice(struct udp_server* server, char* buff)
 }
 
 
-void udp_servererminate(struct udp_server* server)
-{
-    close(server->server_fd);
-}
-
-
-void udp_send_messageo_client(int client, const char* message)
-{
+void udp_send_messageo_client(int client, const char* message) {
     struct sockaddr_in servaddr, cliaddr; 
     int len;
     sendto(client, message, strlen(message), MSG_CONFIRM, (const struct sockaddr *) &cliaddr, len); 

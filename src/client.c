@@ -10,74 +10,21 @@
 #include "sliding-window/buffer.h"
 #include "sliding-window/sending_window.h"
 
+typedef struct parameters {
+    int port;
+    const char* url;
+    const char* arquivo;
+} parameters;
 
-void verify_server_message_code(short* buff, short response) {
-    short value = *buff;
-    if(value != response)
-    {
-        printf(
-            "Invalid response '%i' from server, should be '%i'!\n",
-            value,
-            response
-        );
-        exit(-1);
-    }
-}
+void verify_server_message_code(short* buff, short response);
 
+parameters get_parameters(int argc, char** argv);
 
 int main(int argc, char *argv[]) {
-    if(argc < 3) 
-    {
-        printf("Argumentos insuficientes!\n");
-        return -1;
-    }
+    parameters params = get_parameters(argc, argv);
 
-    const char* url = argv[1];
-    int port = atoi(argv[2]);
-    
-    char* arquivo = argv[3];
-
-    char* archive_name = malloc(strlen(arquivo) + 1);
-    memcpy(archive_name, arquivo, strlen(arquivo) + 1);
-
-    if(strlen(archive_name) > 15)
-    {
-        printf("[Error]: O nome do arquivo tem mais de 15 caracteres!\n");
-        exit(-1);
-    }
-
-    const char s[2] = ".";
-
-    char *token, *suffix;
-    
-    token = strtok(archive_name, s);
-
-    int i = 0;
-
-    while( token != NULL ) {
-        i++;
-        suffix = token;
-        token = strtok(NULL, s);
-    }
-
-    if(i > 2)
-    {
-        printf("[Error]: O nome do arquivo tem multiplos '.'!\n");
-        exit(-1);
-    }
-
-    if(strlen(suffix) != 3)
-    {
-        printf("[Error]: O suffixo do arquivo tem menos de 3 caracteres!\n");
-        exit(-1); 
-    }
-
-    free(archive_name);
-
-    sending_window* window;
-    sending_window_create(&window, arquivo);
-
-    struct tcp_client* client = tcp_client_create(url, port);
+    sending_window* window = sending_window_create(params.arquivo);
+    tcp_client* client = tcp_client_create(params.url, params.port);
 
     short hello_msg = 1;
     short file_msg  = 3;
@@ -91,7 +38,6 @@ int main(int argc, char *argv[]) {
     buffer* ok_buff     = buffer_create(2);
     buffer* dados_buff  = buffer_create(1008);
 
-
     buffer_set(hello_buff, 0, &hello_msg, 2);
 
     tcp_client_send(client, buffer_get(hello_buff, 0), 2);
@@ -103,7 +49,7 @@ int main(int argc, char *argv[]) {
     int udp_port = *(int*)buffer_get(conn_buff, 2);
     
     buffer_set(file_buff, 0, &file_msg, 2);
-    buffer_set(file_buff, 2, arquivo, strlen(arquivo) + 1);
+    buffer_set(file_buff, 2, (void*)params.arquivo, strlen(params.arquivo) + 1);
     buffer_set(file_buff, 17, &window->size, sizeof(long));
 
     tcp_client_send(client, buffer_get(file_buff, 0), 25);
@@ -112,11 +58,9 @@ int main(int argc, char *argv[]) {
 
     verify_server_message_code(buffer_get(ok_buff,0), 4);
 
-    struct udp_client* udp_client = NULL;
+    udp_client* udp_client = udp_client_create(params.url, udp_port);
 
-    udp_client_create(&udp_client, url, udp_port);
-
-    tcp_client_set_timeout(client, 500);
+    tcp_client_set_timeout(client, 100);
 
     while(!sending_window_eof(window)) {
         for(int i=0; i < WINDOW_SIZE && window->head + i < window->frame_count; i++) {
@@ -147,6 +91,7 @@ int main(int argc, char *argv[]) {
             verify_server_message_code(buffer_get(ack_buff,0), 7);
     
             unsigned sequence = *(unsigned*)buffer_get(ack_buff, 2);
+            printf("ack: %i\n", sequence);
             sending_window_ack_frame(window, sequence);
         }
     }
@@ -165,5 +110,82 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
+    tcp_client_destroy(client);
+    udp_client_destroy(udp_client);
+
+    buffer_destroy(hello_buff);
+    buffer_destroy(dados_buff);
+    buffer_destroy(ack_buff);
+    buffer_destroy(ok_buff);
+    buffer_destroy(file_buff);
+    buffer_destroy(conn_buff);
+
     return 0;
+}
+
+void verify_server_message_code(short* buff, short response) {
+    short value = *buff;
+    if(value != response)
+    {
+        printf(
+            "Invalid response '%i' from server, should be '%i'!\n",
+            value,
+            response
+        );
+        exit(-1);
+    }
+}
+
+parameters get_parameters(int argc, char** argv) {
+    parameters params;
+
+    if(argc < 3) {
+        printf("Argumentos insuficientes!\n");
+        exit(-1);
+    }
+
+    const char* url = argv[1];
+    int port = atoi(argv[2]);
+
+    params.url = url;
+    params.port = port;
+
+    char* arquivo = argv[3];
+    params.arquivo = arquivo;
+
+    char* archive_name = malloc(strlen(arquivo) + 1);
+    memcpy(archive_name, arquivo, strlen(arquivo) + 1);
+
+    if(strlen(archive_name) > 15) {
+        printf("[Error]: O nome do arquivo tem mais de 15 caracteres!\n");
+        exit(-1);
+    }
+
+    const char s[2] = ".";
+
+    char *token, *suffix;
+    
+    token = strtok(archive_name, s);
+
+    int i = 0;
+
+    while( token != NULL ) {
+        i++;
+        suffix = token;
+        token = strtok(NULL, s);
+    }
+
+    if(i > 2) {
+        printf("[Error]: O nome do arquivo tem multiplos '.'!\n");
+        exit(-1);
+    }
+
+    if(strlen(suffix) != 3) {
+        printf("[Error]: O suffixo do arquivo tem menos de 3 caracteres!\n");
+        exit(-1); 
+    }
+
+    free(archive_name);
+
+    return params;
 }

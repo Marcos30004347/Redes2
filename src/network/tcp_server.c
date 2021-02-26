@@ -11,51 +11,49 @@
 #include <string.h> 
 #include <unistd.h>
 
-struct connection_node {
-    int                             client;
-    struct thread*                thread;
+typedef struct connection_node {
+    int               client;
+    struct thread*    thread;
     
-    struct connection_node*       next;
-    struct connection_node*       prev;
-};
+    struct connection_node*  next;
+    struct connection_node*  prev;
+} connection_node;
 
-struct connection {
-    int                             client_fd;
-    struct sockaddr_in              client_address;
-};
+typedef struct connection {
+    int                 client_fd;
+    struct sockaddr_in  client_address;
+} connection;
 
-struct thread_data {
-    struct tcp_server*            server;
-    int                             connfd;
-};
+typedef struct thread_data {
+    struct tcp_server*   server;
+    int                  connfd;
+} thread_data;
 
-struct tcp_connection {
-    tcp_server*   server;
-    int             client_fd;
-};
+typedef struct tcp_connection {
+    tcp_server* server;
+    int         client_fd;
+} tcp_connection;
 
-struct tcp_server {
-    int                             server_fd;
-    struct sockaddr_storage         address;
-    struct connection_node*       connections;
-    tcp_server_handler            handler;
-};
+typedef struct tcp_server {
+    int                     port;
+    int                     server_fd;
+    struct sockaddr_storage address;
+    connection_node*        connections;
+    tcp_server_handler      handler;
+} tcp_server;
 
 
 
-long connection_read(tcp_connection* con, void* buffer, int len) 
-{
+long connection_read(tcp_connection* con, void* buffer, int len)  {
     return read(con->client_fd, buffer, len);
 }
 
-long connection_write(tcp_connection* con, void* buffer, int len) 
-{
+long connection_write(tcp_connection* con, void* buffer, int len)  {
     write(con->client_fd, buffer, len); 
 }
 
-void* tcp_server_client_handler(void* _data)
-{
-    struct thread_data* data = (struct thread_data*)(_data);
+void* tcp_server_client_handler(void* _data) {
+    thread_data* data = (thread_data*)_data;
     tcp_connection connection;
     connection.client_fd    = data->connfd;
     connection.server       = data->server;
@@ -67,22 +65,20 @@ void* tcp_server_client_handler(void* _data)
     return NULL;
 }
 
-void tcp_server_hold_connection(struct tcp_server* server, struct connection connection) {
-    struct thread* thread = NULL;
+void tcp_server_hold_connection(tcp_server* server, struct connection connection) {
+    thread* thread = NULL;
 
-    struct thread_data* data =(struct thread_data*) malloc(sizeof(struct thread_data));
+    thread_data* data =(thread_data*) malloc(sizeof(thread_data));
 
     data->connfd = connection.client_fd;
     data->server = server;
 
-    struct connection_node* conn = (struct connection_node*)malloc(sizeof(struct connection_node));
+    connection_node* conn = (connection_node*)malloc(sizeof(struct connection_node));
 
-    if(!data->server->connections)
-    {
+    if(!data->server->connections) {
         data->server->connections = conn;
     }
-    else
-    {
+    else {
         data->server->connections->next = conn;
         conn->prev = data->server->connections;
         data->server->connections = conn;
@@ -94,12 +90,13 @@ void tcp_server_hold_connection(struct tcp_server* server, struct connection con
     conn->client = connection.client_fd;
 }
 
-struct tcp_server* tcp_server_create(tcp_server_handler handler, int port)
-{
+tcp_server* tcp_server_create(tcp_server_handler handler, int port) {
     int no = 0;
     int reuseaddr = 1;
 
-    struct tcp_server* server = (struct tcp_server*)malloc(sizeof(struct tcp_server));
+    tcp_server* server = (tcp_server*)malloc(sizeof(tcp_server));
+    
+    server->port = port;
     
     struct sockaddr_in6 *addr = (struct sockaddr_in6 *)&server->address;
 
@@ -111,8 +108,7 @@ struct tcp_server* tcp_server_create(tcp_server_handler handler, int port)
     }
 
     setsockopt(server->server_fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&no, sizeof(no)); 
-    if (setsockopt(server->server_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuseaddr,sizeof(reuseaddr)) < 0)
-    {
+    if (setsockopt(server->server_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuseaddr,sizeof(reuseaddr)) < 0) {
         perror("setsockopt(SO_REUSEADDR) failed");
         exit(-1);
     }
@@ -127,7 +123,7 @@ struct tcp_server* tcp_server_create(tcp_server_handler handler, int port)
     server->handler = handler;
 
 
-    if ((bind(server->server_fd, (struct sockaddr *)addr, sizeof(*addr)) != 0)) { 
+    if (bind(server->server_fd, (struct sockaddr *)addr, sizeof(*addr)) != 0) { 
         printf("socket bind failed...\n"); 
         exit(0); 
     } 
@@ -135,11 +131,9 @@ struct tcp_server* tcp_server_create(tcp_server_handler handler, int port)
     return server;
 }
 
-void tcp_server_destroy(struct tcp_server* server)
-{
-    struct connection_node * tmp;
-    while (server->connections)
-    {
+void tcp_server_destroy(tcp_server* server) {
+    connection_node * tmp;
+    while (server->connections) {
         tmp = server->connections;
 
         server->connections = server->connections->prev;
@@ -153,35 +147,30 @@ void tcp_server_destroy(struct tcp_server* server)
     free(server);
 }
 
-struct connection tcp_server_accept_connection(struct tcp_server* server)
-{
-    struct connection conn;
+struct connection tcp_server_accept_connection(tcp_server* server) {
+    connection conn;
     socklen_t len = sizeof(conn.client_address); 
     conn.client_fd = accept(server->server_fd, (struct sockaddr*)&conn.client_address, &len); 
     return conn;
 }
 
-void tcp_server_start(struct tcp_server* server)
-{
-    if ((listen(server->server_fd, 10)) != 0) { 
+void tcp_server_start(tcp_server* server) {
+    if (listen(server->server_fd, 10) != 0) { 
         printf("[ERROR]: Nao foi possivel escutar\n"); 
         exit(0); 
     }
 
-    printf("listening...\n");
-    struct connection connection = tcp_server_accept_connection(server);
-    printf("connection!\n");
+    printf("Server Listening on port '%i'!\n", server->port);
+    connection connection;
 
-    while(connection.client_fd != -1)
-    {
-        tcp_server_hold_connection(server, connection);
+    do {
         connection = tcp_server_accept_connection(server);
-    }
+        tcp_server_hold_connection(server, connection);
+    } while(connection.client_fd != -1);
 }
 
 
-void tcp_server_disconnect_client(struct tcp_connection* conn)
-{
+void tcp_server_disconnect_client(tcp_connection* conn) {
     close(conn->client_fd);
 }
 

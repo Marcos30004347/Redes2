@@ -17,37 +17,38 @@ void print_sending_window(sending_window* sliding)
     printf("\n");
 }
 
-void sending_window_create(sending_window** sliding, const char* filename)
+sending_window* sending_window_create(const char* filename)
 {
-    *sliding = (sending_window*)malloc(sizeof(sending_window));
-    (*sliding)->window = 0;
-    (*sliding)->head = 0;
-    (*sliding)->file = fopen(filename, "rb");
+    sending_window* sliding = (sending_window*)malloc(sizeof(sending_window));
+    sliding->window = 0;
+    sliding->head = 0;
+    sliding->file = fopen(filename, "rb");
 
-    fseek((*sliding)->file, 0L, SEEK_END);
+    fseek(sliding->file, 0L, SEEK_END);
 
-    (*sliding)->size = ftell((*sliding)->file);
+    sliding->size = ftell(sliding->file);
 
-    fseek((*sliding)->file, 0L, 0);
+    fseek(sliding->file, 0L, 0);
 
-    (*sliding)->frame_count = (long)ceil((*sliding)->size/(float)FRAME_SIZE);
+    sliding->frame_count = (long)ceil(sliding->size/(float)FRAME_SIZE);
 
-    (*sliding)->buffer = malloc(sizeof(char*)*WINDOW_SIZE*2);
+    sliding->buffer = malloc(sizeof(char*)*WINDOW_SIZE*2);
     for(int i=0; i<WINDOW_SIZE*2; i++)
     {
-        (*sliding)->buffer[i] = malloc(sizeof(char)*FRAME_SIZE);
+        sliding->buffer[i] = malloc(sizeof(char)*FRAME_SIZE);
     }
 
     for(int i=0;i<WINDOW_SIZE; i++)
     {
         int payload_size = FRAME_SIZE;
 
-        if((*sliding)->head + i == (*sliding)->frame_count - 1)
-            payload_size = (*sliding)->size%FRAME_SIZE;
+        if(sliding->head + i == sliding->frame_count - 1)
+            payload_size = sliding->size%FRAME_SIZE;
 
-        fseek((*sliding)->file, ((*sliding)->head + i)*FRAME_SIZE, SEEK_SET);
-        fread((*sliding)->buffer[i], sizeof(char), payload_size, (*sliding)->file);
+        fseek(sliding->file, (sliding->head + i)*FRAME_SIZE, SEEK_SET);
+        fread(sliding->buffer[i], sizeof(char), payload_size, sliding->file);
     }
+    return sliding;
 }
 
 void sending_window_destroy(sending_window* sliding)

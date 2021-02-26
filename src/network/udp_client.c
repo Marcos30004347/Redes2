@@ -18,33 +18,27 @@ struct udp_client;
 
 typedef void(*client_handler)(struct udp_client*, char*);
 
-struct udp_client
-{
+struct udp_client {
     struct sockaddr_in6 server_adress;
     int client_fd;
 	client_handler on_receive;
 };
 
-int udp_client_receive(struct udp_client* client, void* message, int length)
-{
+int udp_client_receive(struct udp_client* client, void* message, int length) {
 	int len;
 	recvfrom(client->client_fd, message, length, MSG_WAITALL, (struct sockaddr*)&client->server_adress, &len);
 	return 1;
 }
 
-void udp_client_send(struct udp_client* client, void* message, int len)
-{
+void udp_client_send(struct udp_client* client, void* message, int len) {
     sendto(client->client_fd, message, len, 
         MSG_CONFIRM, (const struct sockaddr *) &client->server_adress,  
             sizeof(client->server_adress)); 
 }
 
 
-void udp_client_create(struct udp_client** client, const char* url, int port)
-{
-    *client = (struct udp_client*)malloc(sizeof(struct udp_client));
-    struct udp_client* c = *client;
-
+udp_client* udp_client_create(const char* url, int port) {
+    udp_client* c = (struct udp_client*)malloc(sizeof(udp_client));
 
 	struct in6_addr serveraddr;
 	struct addrinfo hints, *res=NULL;
@@ -87,16 +81,13 @@ void udp_client_create(struct udp_client** client, const char* url, int port)
 
 	c->server_adress = *(struct sockaddr_in6*)res->ai_addr;
 
-	// int flags = fcntl(c->client_fd, F_GETFL, 0);
-	// fcntl(c->client_fd, F_SETFL , flags | O_NONBLOCK);
+	return c;
 }
 
-void udp_client_destroy(struct udp_client* client)
-{
+void udp_client_destroy(udp_client* client) {
 	free(client);
 }
 
-void udp_client_disconnect(struct udp_client* client)
-{
+void udp_client_disconnect(udp_client* client) {
 	close(client->client_fd);
 }

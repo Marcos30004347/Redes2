@@ -2,37 +2,32 @@
 #define NETWORK_UDP_CLIENT_H
 
 
-/**
- * @brief TCP Client data structure.
- */
+
 struct udp_client;
 
-/**
- * @brief Send a message to the server.
- */
-void udp_client_send(struct udp_client* client, void* message, int len);
+typedef struct udp_client udp_client;
 
-/**
- * @brief Allocates and initialize a udp_client structure.
- */
-void udp_client_create(struct udp_client** client, const char* url, int port);
+void udp_client_send(udp_client* client, void* message, int len);
+
+
+udp_client* udp_client_create(const char* url, int port);
 
 /**
  * @brief Destroys and dealocates a udp_client structure.
  */
-void udp_client_destroy(struct udp_client* client);
+void udp_client_destroy(udp_client* client);
 
 /**
  * @brief Disconnect a udp_client from the server.
  */
-void udp_client_disconnect(struct udp_client* client);
+void udp_client_disconnect(udp_client* client);
 
 /**
  * @brief Try to receive a message from the server
  */
-int udp_client_receive(struct udp_client* client, void* message, int length);
+int udp_client_receive(udp_client* client, void* message, int length);
 
-int udp_client_receive_withimeout(struct udp_client* client, void* message, int length);
+int udp_client_receive_withimeout(udp_client* client, void* message, int length);
 
 
 #endif

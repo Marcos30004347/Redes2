@@ -6,7 +6,6 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h> 
-#include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/select.h>
@@ -14,16 +13,17 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+
 typedef void(*client_handler)(struct tcp_client*, char*);
 
-struct tcp_client
+typedef struct tcp_client
 {
 	int blocking;
 	unsigned long ms;
     int client_fd;
     int flags;
 	client_handler on_receive;
-};
+} tcp_client;
 
 
 int addrparse(const char *addrstr, int port, struct sockaddr_storage *storage) {
@@ -34,8 +34,7 @@ int addrparse(const char *addrstr, int port, struct sockaddr_storage *storage) {
     return -1;
 }
 
-
-int tcp_client_receive(struct tcp_client* client, void* message, int length)
+int tcp_client_receive(tcp_client* client, void* message, int length)
 {
 	if(client->blocking){
 		int sd = client->client_fd;
@@ -70,9 +69,6 @@ struct tcp_client* tcp_client_create(const char* url, int port)
     struct tcp_client* c = (struct tcp_client*)malloc(sizeof(struct tcp_client));
 	c->blocking = 0;
 	c->ms = 0;
-    printf("url: %s\n", url);
-
-	printf("IPv6\n");
 
 	struct in6_addr serveraddr;
 	struct addrinfo hints, *res=NULL;

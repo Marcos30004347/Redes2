@@ -21,7 +21,7 @@ typedef struct {
 } receiving_window;
 
 
-void receiving_window_create(receiving_window** sliding, const char* filename, long frame_count);
+receiving_window* receiving_window_create(const char* filename, long frame_count);
 void receiving_window_destroy(receiving_window* sliding);
 int receiving_window_eof(receiving_window* sliding);
 void receiving_window_ack_frame(receiving_window* sliding, long frame, const char* payload, long len);

@@ -28,7 +28,6 @@ void verify_client_message_code(short* buff, short response) {
 
 int hello(tcp_connection* connection)
 {
-    receiving_window* window = NULL;
     udp_server* udp_server = udp_server_create(0);;
 
     short conn_resp = 2;
@@ -42,7 +41,7 @@ int hello(tcp_connection* connection)
     buffer* conn_buff   = buffer_create(6);
     buffer* file_buff   = buffer_create(25);
     buffer* ok_buff     = buffer_create(2);
-    buffer* win_buff    = buffer_create(2048);
+    buffer* win_buff    = buffer_create(1008);
     buffer* end_buff    = buffer_create(2);
     buffer* ack_buff    = buffer_create(6);
 
@@ -65,8 +64,7 @@ int hello(tcp_connection* connection)
     // Start the sliding window data structures
     char* filepath = (char*)malloc(strlen("teste.txt") + strlen("database/"));
     sprintf(filepath, "%s/%s", "output", "teste.txt");
-    receiving_window_create(&window, filepath, (long)ceil(file_size/(float)FRAME_SIZE));
-    free(filepath);
+    receiving_window* window = receiving_window_create(filepath, (long)ceil(file_size/(float)FRAME_SIZE));
 
     // Send message to the client telling that it can start sendind frames
     buffer_set(ok_buff, 0, &ok_resp, sizeof(short));
@@ -100,9 +98,11 @@ int hello(tcp_connection* connection)
     buffer_destroy(file_buff);
     buffer_destroy(ok_buff);
     buffer_destroy(win_buff);
-
+    
     udp_server_destroy(udp_server);
     receiving_window_destroy(window);
+    
+    free(filepath);
     
     return 1;
 }

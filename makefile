@@ -1,8 +1,13 @@
 all: server client
 
+setup-trafic:
+	sudo tc qdisc add dev lo root netem rate 1mbit limit 20 delay 10ms loss 10%
+
+cleanup-trafic:
+	sudo tc qdisc del dev lo root
+
 server:
 	gcc \
-	-fno-stack-protector \
 	src/sliding-window/buffer.c \
 	src/server.c \
 	src/network/tcp_server.c \
@@ -13,7 +18,6 @@ server:
 
 client:
 	gcc \
-	-fno-stack-protector \
 	src/client.c \
 	src/network/tcp_client.c \
 	src/sliding-window/buffer.c \

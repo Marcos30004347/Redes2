@@ -3,6 +3,8 @@
 
 struct thread;
 
+typedef struct thread thread;
+
 typedef void*(*thread_handler)(void*);
 
 void thread_create(struct thread** thread, thread_handler handler, void* arg);
