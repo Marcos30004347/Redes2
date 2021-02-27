@@ -108,9 +108,7 @@ connection udp_server_accept_connection(udp_server* server) {
 }
 
 long udp_server_receice(udp_server* server, char* buff)  {
-    int len;
-    struct sockaddr_in cliaddr;
-    long resp = recvfrom(server->server_fd, buff, 1008, MSG_WAITALL, (struct sockaddr *) &cliaddr, &len); 
+    long resp = recvfrom(server->server_fd, buff, 1008, MSG_WAITALL, NULL, NULL); 
     return resp;
 }
 

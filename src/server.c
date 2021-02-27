@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include "network/async.h"
 #include "network/tcp_server.h"
 #include "network/udp_server.h"
 
@@ -10,8 +14,6 @@
 
 #include "sliding-window/buffer.h"
 #include "sliding-window/receiving_window.h"
-
-#define FRAME_SIZE 1000
 
 void verify_client_message_code(short* buff, short response) {
     short value = *buff;
@@ -23,11 +25,16 @@ void verify_client_message_code(short* buff, short response) {
         );
         exit(-1);
     }
-
 }
 
-int hello(tcp_connection* connection)
-{
+int handler(tcp_connection* connection) {
+    short type;
+
+    connection_read(connection, &type, sizeof(short));
+    verify_client_message_code(&type, 1);
+
+    mutex* mut = mutex_create();
+    thread* threads[WINDOW_SIZE];
     udp_server* udp_server = udp_server_create(0);;
 
     short conn_resp = 2;
@@ -60,6 +67,12 @@ int hello(tcp_connection* connection)
     char* file_name  = ((char*)buffer_get(file_buff, 2));
     long  file_size = *((long*)buffer_get(file_buff, 17));
 
+    // Verifique se o diretório de output existe
+    // Caso contrário crie-o
+    struct stat st = {0};
+    if (stat("./output", &st) == -1) {
+        mkdir("./output", 0700);
+    }
 
     // Start the sliding window data structures
     char* filepath = (char*)malloc(strlen("teste.txt") + strlen("database/"));
@@ -69,7 +82,7 @@ int hello(tcp_connection* connection)
     // Send message to the client telling that it can start sendind frames
     buffer_set(ok_buff, 0, &ok_resp, sizeof(short));
     connection_write(connection, buffer_get(ok_buff, 0), sizeof(short));
-
+    
     while(!receiving_window_eof(window)) {
         udp_server_receice(udp_server, buffer_get(win_buff, 0));
 
@@ -102,23 +115,13 @@ int hello(tcp_connection* connection)
     udp_server_destroy(udp_server);
     receiving_window_destroy(window);
     
+    mutex_destroy(mut);
     free(filepath);
-    
+
+    tcp_server_disconnect_client(connection);    
     return 1;
 }
 
-
-int server_handler(tcp_connection* conn)
-{
-    short type;
-    connection_read(conn, &type, sizeof(short));
-    if(type == MESSAGE_HELLO) {
-        hello(conn);
-    }
-
-    tcp_server_disconnect_client(conn);
-    return 0;
-}
 
 int main(int argc, char *argv[]) {
     if(argc < 2) {
@@ -128,7 +131,7 @@ int main(int argc, char *argv[]) {
 
     int port = atoi(argv[1]);
 
-    tcp_server* server = tcp_server_create(server_handler, port);
+    tcp_server* server = tcp_server_create(handler, port);
     tcp_server_start(server);
     tcp_server_destroy(server);
 

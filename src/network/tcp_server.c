@@ -66,8 +66,6 @@ void* tcp_server_client_handler(void* _data) {
 }
 
 void tcp_server_hold_connection(tcp_server* server, struct connection connection) {
-    thread* thread = NULL;
-
     thread_data* data =(thread_data*) malloc(sizeof(thread_data));
 
     data->connfd = connection.client_fd;
@@ -84,9 +82,9 @@ void tcp_server_hold_connection(tcp_server* server, struct connection connection
         data->server->connections = conn;
     }
 
-    thread_create(&thread, tcp_server_client_handler, data);
+    thread* t = thread_create(tcp_server_client_handler, data);
 
-    conn->thread = thread;
+    conn->thread = t;
     conn->client = connection.client_fd;
 }
 

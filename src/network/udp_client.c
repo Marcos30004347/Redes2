@@ -25,8 +25,7 @@ struct udp_client {
 };
 
 int udp_client_receive(struct udp_client* client, void* message, int length) {
-	int len;
-	recvfrom(client->client_fd, message, length, MSG_WAITALL, (struct sockaddr*)&client->server_adress, &len);
+	recvfrom(client->client_fd, message, length, MSG_WAITALL, NULL, NULL);
 	return 1;
 }
 
@@ -80,6 +79,9 @@ udp_client* udp_client_create(const char* url, int port) {
 	}
 
 	c->server_adress = *(struct sockaddr_in6*)res->ai_addr;
+	
+	int flags = fcntl(c->client_fd, F_GETFL, 0);
+	int result = fcntl(c->client_fd, F_SETFL , flags | O_NONBLOCK);
 
 	return c;
 }
