@@ -79,19 +79,11 @@ struct tcp_client* tcp_client_create(const char* url, int port)
 	hints.ai_family   = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 
-	int rc = inet_pton(AF_INET, url, &serveraddr);
-
-	if (rc == 1)    /* valid IPv4 text address? */
-	{
+	if (inet_pton(AF_INET, url, &serveraddr) == 1) {
 		hints.ai_family = AF_INET;
 		hints.ai_flags |= AI_NUMERICHOST;
-	}
-	else
-	{
-		rc = inet_pton(AF_INET6, url, &serveraddr);
-		if (rc == 1) /* valid IPv6 text address? */
-		{
-
+	} else {
+		if (inet_pton(AF_INET6, url, &serveraddr) == 1) {
 			hints.ai_family = AF_INET6;
 			hints.ai_flags |= AI_NUMERICHOST;
 		}
@@ -100,9 +92,8 @@ struct tcp_client* tcp_client_create(const char* url, int port)
 	char sport[10];
 	itoa(port, sport, 10);
 
-	rc = getaddrinfo(url, sport, &hints, &res);
-	if (rc != 0)
-	{
+	int rc = getaddrinfo(url, sport, &hints, &res);
+	if (rc != 0) {
 		printf("Host not found --> %s\n", gai_strerror(rc));
 		if (rc == EAI_SYSTEM)
 			perror("getaddrinfo() failed");

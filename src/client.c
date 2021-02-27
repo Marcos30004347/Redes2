@@ -50,11 +50,13 @@ void* wait_ack_for_frame(void* data);
 void* send_frame(void* data);
 
 int main(int argc, char *argv[]) {
+
     parameters params = get_parameters(argc, argv);
     
     thread* window_threads[WINDOW_SIZE];
 
     mutex* mut = mutex_create();
+    // printf("A\n");
 
     sending_window* window = sending_window_create(params.arquivo);
     tcp_client* client = tcp_client_create(params.url, params.port);
@@ -68,6 +70,7 @@ int main(int argc, char *argv[]) {
     buffer* conn_buff   = buffer_create(6);
     buffer* file_buff   = buffer_create(25);
     buffer* ok_buff     = buffer_create(2);
+    // printf("A\n");
 
     buffer_set(hello_buff, 0, &hello_msg, 2);
 
@@ -82,6 +85,7 @@ int main(int argc, char *argv[]) {
     buffer_set(file_buff, 0, &file_msg, 2);
     buffer_set(file_buff, 2, (void*)params.arquivo, strlen(params.arquivo) + 1);
     buffer_set(file_buff, 17, &window->size, sizeof(long));
+    // printf("A\n");
 
     tcp_client_send(client, buffer_get(file_buff, 0), 25);
 
@@ -92,11 +96,13 @@ int main(int argc, char *argv[]) {
     udp_client* udp_client = udp_client_create(params.url, udp_port);
 
     tcp_client_set_timeout(client, 300);
+    // printf("A\n");
 
     while(!sending_window_eof(window)) {
         // Get the current window head
         // This is the first frame in the window
         long head = window->head;
+        // printf("A\n");
 
         // Send the frames in parallel
         for(int i=0; i < WINDOW_SIZE; i++) {
@@ -166,7 +172,7 @@ void verify_server_message_code(short* buff, short response) {
 parameters get_parameters(int argc, char** argv) {
     parameters params;
 
-    if(argc < 3) {
+    if(argc < 4) {
         printf("Argumentos insuficientes!\n");
         exit(-1);
     }
@@ -182,6 +188,7 @@ parameters get_parameters(int argc, char** argv) {
 
     char* archive_name = malloc(strlen(arquivo) + 1);
     memcpy(archive_name, arquivo, strlen(arquivo) + 1);
+
 
     if(strlen(archive_name) > 15) {
         printf("[Error]: O nome do arquivo tem mais de 15 caracteres!\n");
@@ -226,8 +233,9 @@ void* wait_ack_for_frame(void* _data){
     }
 
     buffer* ack_buff    = buffer_create(6);
-
+    // printf("ACK\n");
     if(tcp_client_receive(data->tcp_client, buffer_get(ack_buff,0), 6)) {
+        // printf("ACK\n");
         verify_server_message_code(buffer_get(ack_buff,0), 7);
 
         unsigned sequence = *(unsigned*)buffer_get(ack_buff, 2);
@@ -272,7 +280,6 @@ void* send_frame(void* _data) {
     buffer_set(dados_buff, 0, &data_msg, sizeof(short));
     buffer_set(dados_buff, 2, &sequence, sizeof(int));
     buffer_set(dados_buff, 6, &payload_size, sizeof(short));
-
     buffer_set(dados_buff, 8, sending_window_get_data_from_head(data->window, data->head + data->i), payload_size);
 
     udp_client_send(data->udp_client, buffer_get(dados_buff,0), 8+payload_size);  

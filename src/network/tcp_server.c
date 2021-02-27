@@ -49,7 +49,7 @@ long connection_read(tcp_connection* con, void* buffer, int len)  {
 }
 
 long connection_write(tcp_connection* con, void* buffer, int len)  {
-    write(con->client_fd, buffer, len); 
+   return write(con->client_fd, buffer, len); 
 }
 
 void* tcp_server_client_handler(void* _data) {

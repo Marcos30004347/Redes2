@@ -24,20 +24,17 @@ struct udp_client {
 	client_handler on_receive;
 };
 
-int udp_client_receive(struct udp_client* client, void* message, int length) {
-	recvfrom(client->client_fd, message, length, MSG_WAITALL, NULL, NULL);
-	return 1;
-}
+
 
 void udp_client_send(struct udp_client* client, void* message, int len) {
-    sendto(client->client_fd, message, len, 
-        MSG_CONFIRM, (const struct sockaddr *) &client->server_adress,  
-            sizeof(client->server_adress)); 
+    sendto(client->client_fd, message, len, MSG_CONFIRM, (const struct sockaddr *) &client->server_adress, sizeof(client->server_adress)); 
 }
-
 
 udp_client* udp_client_create(const char* url, int port) {
     udp_client* c = (struct udp_client*)malloc(sizeof(udp_client));
+
+	printf(" port = %i\n", port);
+	printf(" url = %s\n", url);
 
 	struct in6_addr serveraddr;
 	struct addrinfo hints, *res=NULL;
@@ -63,6 +60,7 @@ udp_client* udp_client_create(const char* url, int port) {
 	char sport[10];
 	itoa(port, sport, 10);
 
+
 	int rc = getaddrinfo(url, sport, &hints, &res);
 
 	if (rc != 0) {
@@ -79,9 +77,9 @@ udp_client* udp_client_create(const char* url, int port) {
 	}
 
 	c->server_adress = *(struct sockaddr_in6*)res->ai_addr;
-	
-	int flags = fcntl(c->client_fd, F_GETFL, 0);
-	int result = fcntl(c->client_fd, F_SETFL , flags | O_NONBLOCK);
+
+	// int flags = fcntl(c->client_fd, F_GETFL, 0);
+	// fcntl(c->client_fd, F_SETFL , flags | O_NONBLOCK);
 
 	return c;
 }

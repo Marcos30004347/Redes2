@@ -22,12 +22,5 @@ void udp_client_destroy(udp_client* client);
  */
 void udp_client_disconnect(udp_client* client);
 
-/**
- * @brief Try to receive a message from the server
- */
-int udp_client_receive(udp_client* client, void* message, int length);
-
-int udp_client_receive_withimeout(udp_client* client, void* message, int length);
-
 
 #endif

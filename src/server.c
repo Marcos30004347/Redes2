@@ -17,6 +17,7 @@
 
 void verify_client_message_code(short* buff, short response) {
     short value = *buff;
+    printf("%i\n", value);
     if(value != response) {
         printf(
             "Invalid response '%i' from client, should be '%i'!\n",
@@ -43,6 +44,7 @@ int handler(tcp_connection* connection) {
     short ack_resp  = 7;
 
     int udp_port = udp_server_get_port(udp_server);
+    printf("udp_port=%i\n", udp_port);
 
     // Intermediate buffers
     buffer* conn_buff   = buffer_create(6);
@@ -62,7 +64,6 @@ int handler(tcp_connection* connection) {
     connection_read(connection, buffer_get(file_buff, 0), 25);
 
     verify_client_message_code(buffer_get(file_buff, 0), 3);
-
     // Frame params
     char* file_name  = ((char*)buffer_get(file_buff, 2));
     long  file_size = *((long*)buffer_get(file_buff, 17));
@@ -84,7 +85,9 @@ int handler(tcp_connection* connection) {
     connection_write(connection, buffer_get(ok_buff, 0), sizeof(short));
     
     while(!receiving_window_eof(window)) {
+        printf("Recv\n");
         udp_server_receice(udp_server, buffer_get(win_buff, 0));
+        printf("Recv\n");
 
         // Verify if the received message start with a '6'
         verify_client_message_code(buffer_get(win_buff, 0), 6);
@@ -92,7 +95,6 @@ int handler(tcp_connection* connection) {
         // Get arrived 'sequence' and 'payload size'
         int sequence        = *(int*)buffer_get(win_buff, 2);
         short payload_size  = *(short*)buffer_get(win_buff, 6);
-    
         // Save the received frame
         receiving_window_ack_frame(window, sequence, buffer_get(win_buff, 8), payload_size);
 
